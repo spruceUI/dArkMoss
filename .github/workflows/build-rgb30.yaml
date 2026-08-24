@@ -1,0 +1,84 @@
+# Build the dArkMoss RGB30 image (Powkiddy RGB30, Rockchip RK3566) on a
+# GitHub-hosted runner.
+#
+# dArkOS builds a Debian rootfs with debootstrap and only compiles the kernel
+# and (upstream) a pile of emulators from source. dArkMoss strips the emulators
+# and the EmulationStation frontend out of build_rgb30.sh - spruce provides all
+# of that from TF2 - so this build is debootstrap + kernel + image assembly,
+# which is far shorter and far less fragile than the JELOS-lineage MossySpruce
+# build it replaces.
+#
+# The build needs real root, loop devices, an arm64 chroot via qemu-user-static,
+# and a lot of disk. GitHub's ubuntu runner gives us passwordless sudo and loop
+# devices; we reclaim disk first because the rootfs + image + 7z do not fit in
+# the ~14 GB free by default.
+
+name: build-rgb30
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (blank = no release, artifact only)"
+        required: false
+        default: ""
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Reclaim runner disk
+        run: |
+          # The build writes a multi-GB rootfs, a raw image, and a 7z of it.
+          # Clear the big preinstalled toolchains we do not use.
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+                      /usr/local/.ghcup /opt/hostedtoolcache/CodeQL \
+                      /usr/share/swift /usr/local/share/powershell || true
+          sudo docker image prune --all --force || true
+          df -h /
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build prerequisites
+        run: |
+          # prepare.sh installs these too, but doing it here surfaces an apt
+          # problem as its own clearly-labelled step instead of deep in the build.
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc btrfs-progs build-essential bison flex ccache curl debconf-utils \
+            debootstrap device-tree-compiler dosfstools e2fsprogs eatmydata gcc \
+            gdisk jq lib32stdc++6 libc6-i386 libncurses5-dev libssl-dev lz4 lzop \
+            p7zip-full parted python-is-python3 qemu-user-static zlib1g:i386 xfsprogs
+
+      - name: Build RGB30
+        run: |
+          chmod +x ./*.sh
+          # Runner already has passwordless sudo; FreeSudo.sh is a no-op here but
+          # keeps parity with a local build.
+          ./build_rgb30.sh
+
+      - name: Show what was produced
+        if: always()
+        run: |
+          echo "=== disk ==="; df -h /
+          echo "=== images ==="; ls -lh *.img *.img.7z* 2>/dev/null || echo "no image produced"
+          echo "=== build log tail ==="; tail -40 build.log 2>/dev/null || true
+
+      - name: Upload image artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dArkMoss-RGB30
+          path: |
+            *.img.7z*
+          if-no-files-found: warn
+
+      - name: Publish release
+        if: success() && inputs.release_tag != ''
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: "*.img.7z*"
