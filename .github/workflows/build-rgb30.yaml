@@ -56,16 +56,41 @@ jobs:
       - name: Build RGB30
         run: |
           chmod +x ./*.sh
-          # Runner already has passwordless sudo; FreeSudo.sh is a no-op here but
-          # keeps parity with a local build.
-          ./build_rgb30.sh
+          # Build through `make`, not ./build_rgb30.sh directly: the Makefile is
+          # what sets and exports DEBIAN_CODE_NAME (the debootstrap suite) and
+          # the other build knobs. Bypassing it leaves DEBIAN_CODE_NAME empty and
+          # debootstrap reads the mirror URL as its target ("can't cd to
+          # http://deb.debian.org"), producing an empty rootfs.
+          # ENABLE_CACHE=n: apt-cacher-ng buys nothing on a one-shot runner.
+          # BUILD_ARMHF=n / BUILD_BLUEALSA=n: spruce brings its own userland, so
+          # skip the 32-bit multiarch and bluetooth-audio setup.
+          make rgb30 ENABLE_CACHE=n BUILD_ARMHF=n BUILD_BLUEALSA=n
 
       - name: Show what was produced
         if: always()
         run: |
           echo "=== disk ==="; df -h /
           echo "=== images ==="; ls -lh *.img *.img.7z* 2>/dev/null || echo "no image produced"
-          echo "=== build log tail ==="; tail -40 build.log 2>/dev/null || true
+          echo "=== build log tail ==="; tail -60 build.log 2>/dev/null || true
+
+      - name: Verify a real image was produced
+        run: |
+          # build_rgb30.sh runs with `set -e` off and pipes through tee, so its
+          # exit code is always 0 - a silently-broken build otherwise reports
+          # green. Guard on the actual artifact and on the fatal markers that
+          # mean the rootfs never populated.
+          if grep -qE "can't cd to http|chroot: failed to run command|debootstrap:.*(E:|failed)" build.log; then
+            echo "::error::build.log shows a debootstrap/chroot failure - the rootfs did not build"
+            grep -nE "can't cd to http|chroot: failed to run command|debootstrap:" build.log | head -20
+            exit 1
+          fi
+          shopt -s nullglob
+          imgs=( *.img.7z* )
+          if [ ${#imgs[@]} -eq 0 ]; then
+            echo "::error::no *.img.7z produced - build did not reach image assembly"
+            exit 1
+          fi
+          echo "image(s) produced:"; ls -lh *.img.7z*
 
       - name: Upload image artifact
         if: success()
