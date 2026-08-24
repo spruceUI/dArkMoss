@@ -1,0 +1,25 @@
+[Unit]
+Description=Hand off to spruce on TF2
+# The frontend starts last, after the base system is up. It does NOT depend on
+# a systemd mount unit for the SD - mount-spruce.sh waits for the card itself.
+After=multi-user.target
+Conflicts=emulationstation.service
+
+[Service]
+Type=idle
+ExecStartPre=/usr/local/sbin/mount-spruce.sh
+# runtime.sh is spruce's own entry point; it detects the platform (RGB30 here)
+# and runs its main loop. Runs as root - spruce does its own mounts and touches
+# hardware directly.
+ExecStart=/bin/sh -lc 'exec /mnt/SDCARD/spruce/scripts/runtime.sh'
+Restart=on-failure
+RestartSec=3
+StandardInput=tty
+StandardOutput=tty
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+
+[Install]
+WantedBy=multi-user.target

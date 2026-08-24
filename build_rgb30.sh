@@ -91,6 +91,7 @@ source ./build_deps.sh
 #fi
 # --- end dArkMoss strip ---------------------------------------------------
 source ./finishing_touches-rk3566.sh
+source ./setup_spruce_handoff-rk3566.sh
 source ./cleanup_filesystem.sh
 source ./write_rootfs-rk3566.sh
 source ./clean_mounts.sh
