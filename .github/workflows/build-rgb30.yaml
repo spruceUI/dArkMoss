@@ -26,7 +26,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    # GitHub's own hard cap for a hosted-runner job is 6h; do not impose an
+    # artificial cap below it. A cold build (full qemu debootstrap + kernel +
+    # build_deps) runs ~3-3.5h, which a 180 cap killed at exactly 3h.
+    timeout-minutes: 360
     steps:
       - name: Reclaim runner disk
         run: |
@@ -148,14 +151,16 @@ jobs:
       # rootfs for the next iteration. Gated on the tarball actually existing, so
       # a failure DURING debootstrap cannot poison the cache with a partial.
       - name: Save the debootstrap rootfs cache
-        if: ${{ !cancelled() && hashFiles('Arkbuild_package_cache/*_rootfs.tar.gz') != '' }}
+        # always() so it still seeds on a timeout/cancel, not just a clean fail;
+        # gated on the tarball so a failure mid-debootstrap can't poison it.
+        if: ${{ always() && hashFiles('Arkbuild_package_cache/*_rootfs.tar.gz') != '' }}
         uses: actions/cache/save@v4
         with:
           path: Arkbuild_package_cache
           key: darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-${{ github.run_id }}
 
       - name: Save the aarch64 toolchain cache
-        if: ${{ !cancelled() && steps.toolchain-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && steps.toolchain-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: .toolchain-cache
