@@ -53,6 +53,22 @@ jobs:
             gdisk jq lib32stdc++6 libc6-i386 libncurses5-dev libssl-dev lz4 lzop \
             p7zip-full parted python-is-python3 qemu-user-static zlib1g:i386 xfsprogs
 
+      - name: Provision the aarch64 toolchain
+        run: |
+          # dArkOS wants the Linaro toolchain at the absolute /opt/toolchains
+          # path. Its local-download fallback (utils.sh) works, but PATHs the
+          # toolchain by a RELATIVE path, which breaks the moment the kernel
+          # build cd's into main/ - "aarch64-linux-gnu-ld not found". Pre-stage
+          # it at /opt/toolchains so utils.sh takes the absolute-path branch.
+          TC=/opt/toolchains/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu
+          if [ ! -x "$TC/bin/aarch64-linux-gnu-ld" ]; then
+            sudo mkdir -p /opt/toolchains
+            sudo git clone --depth=1 \
+              https://github.com/christianhaitian/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu.git \
+              "$TC"
+          fi
+          "$TC/bin/aarch64-linux-gnu-ld" --version | head -1
+
       - name: Build RGB30
         run: |
           chmod +x ./*.sh
