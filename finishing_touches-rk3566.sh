@@ -386,7 +386,7 @@ sudo chroot Arkbuild/ bash -c "systemctl disable nmbd"
 # Set distro identification and version
 sudo mkdir -p Arkbuild/usr/share/plymouth/themes/
 cat <<EOF | sudo tee Arkbuild/usr/share/plymouth/themes/text.plymouth
-title=dArkOS (${BUILD_DATE})
+title=dArkMoss (${BUILD_DATE})
 EOF
 echo "${BUILD_DATE}" | sudo tee Arkbuild/home/ark/.config/.VERSION
 
@@ -396,7 +396,7 @@ sudo chmod 777 Arkbuild/usr/local/bin/boot_text.sh
 sudo cp scripts/welcome-message.service Arkbuild/etc/systemd/system/welcome-message.service
 sudo chroot Arkbuild/ bash -c "systemctl enable welcome-message"
 
-# Mark completed dArkOS updates with this current build
+# Mark completed dArkMoss updates with this current build
 release_tags=( $(git -c 'versionsort.suffix=-' ls-remote --tags --sort='v:refname' https://github.com/christianhaitian/darkos-updates.git | cut -d/ -f3- | sed 's/^v//I') )
 if [[ ! -z "$release_tags" ]]; then
   for release_tag in "${release_tags[@]}"

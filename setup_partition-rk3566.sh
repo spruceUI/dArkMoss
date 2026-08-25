@@ -51,7 +51,7 @@ GUID_BASIC_DATA="EBD0A0A2-B9E5-4433-87C0-68B6B72699C7"
 declare -a PARTS=(
   "uboot 16384 24575 $GUID_UBOOT"          # 4MB
   "resource 24576 32767 $GUID_RESOURCE"    # 4MB
-  "dArkOS_Fat 32768 235519 $GUID_BASIC_DATA" # 104MB
+  "dArkMoss 32768 235519 $GUID_BASIC_DATA" # 104MB
   "rootfs 237568 15445614 $GUID_BASIC_DATA" # ~7.7GB
   "4 15445615 15608046 $GUID_BASIC_DATA"   # 79MB
 )
@@ -67,7 +67,7 @@ sudo partprobe $LOOP_DEV
 sleep 2
 
 # Format partitions where needed
-sudo mkfs.vfat -F 32 -n dArkOS_Fat "${LOOP_DEV}p3"
+sudo mkfs.vfat -F 32 -n dArkMoss "${LOOP_DEV}p3"
 sudo mkfs.${ROOT_FILESYSTEM_FORMAT} ${ROOT_FILESYSTEM_FORMAT_PARAMETERS} "${LOOP_DEV}p4"
 sudo mkfs.vfat -n ROMS "${LOOP_DEV}p5"
 
