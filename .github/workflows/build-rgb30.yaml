@@ -41,6 +41,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Cache the debootstrap rootfs and package cache
+        uses: actions/cache@v4
+        with:
+          path: Arkbuild_package_cache
+          # The heavy stage is the ~1h qemu-emulated debootstrap. dArkOS caches
+          # the finished rootfs to Arkbuild_package_cache/debian_<suite>_rootfs
+          # .tar.gz and reuses it when its recorded Debian version still matches
+          # stable, so persisting this dir skips debootstrap on a hit. run_id in
+          # the save key means a fresh rootfs (after a Debian point release forces
+          # a re-debootstrap) is saved as a new entry; restore-keys picks the most
+          # recent. Correctness is the build's own .commit check, not the key.
+          key: darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-${{ github.run_id }}
+          restore-keys: |
+            darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-
+            darkmoss-rootfs-
+
+      - name: Cache the aarch64 toolchain
+        uses: actions/cache@v4
+        with:
+          # The Linaro toolchain never changes, so a fixed key: saved once,
+          # restored forever. Kept in the workspace so actions/cache (which runs
+          # as the runner, not root) can persist it.
+          path: .toolchain-cache
+          key: darkmoss-toolchain-linaro-6.3.1-2017.05
+
       - name: Install build prerequisites
         run: |
           # prepare.sh installs these too, but doing it here surfaces an apt
@@ -60,14 +85,20 @@ jobs:
           # toolchain by a RELATIVE path, which breaks the moment the kernel
           # build cd's into main/ - "aarch64-linux-gnu-ld not found". Pre-stage
           # it at /opt/toolchains so utils.sh takes the absolute-path branch.
-          TC=/opt/toolchains/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu
-          if [ ! -x "$TC/bin/aarch64-linux-gnu-ld" ]; then
-            sudo mkdir -p /opt/toolchains
-            sudo git clone --depth=1 \
-              https://github.com/christianhaitian/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu.git \
-              "$TC"
+          # Keep the actual clone in a workspace dir (.toolchain-cache) so the
+          # cache step above can persist it, then expose it at the absolute
+          # /opt/toolchains path the build expects via a symlink.
+          TCNAME=gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu
+          LOCAL="$PWD/.toolchain-cache/$TCNAME"
+          if [ ! -x "$LOCAL/bin/aarch64-linux-gnu-ld" ]; then
+            mkdir -p .toolchain-cache
+            git clone --depth=1 \
+              https://github.com/christianhaitian/${TCNAME}.git \
+              "$LOCAL"
           fi
-          "$TC/bin/aarch64-linux-gnu-ld" --version | head -1
+          sudo mkdir -p /opt/toolchains
+          sudo ln -sfn "$LOCAL" "/opt/toolchains/$TCNAME"
+          "/opt/toolchains/$TCNAME/bin/aarch64-linux-gnu-ld" --version | head -1
 
       - name: Build RGB30
         run: |
