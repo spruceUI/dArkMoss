@@ -41,28 +41,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache the debootstrap rootfs and package cache
-        uses: actions/cache@v4
+      # Cache is split restore/save on purpose. The combined actions/cache@v4
+      # only saves on job SUCCESS, but these builds are expected to fail at the
+      # next wall for a while yet, and we specifically want the ~1h debootstrap
+      # seeded even when a later stage fails. The matching save steps run near
+      # the end under if: !cancelled().
+      - name: Restore the debootstrap rootfs cache
+        id: rootfs-cache
+        uses: actions/cache/restore@v4
         with:
           path: Arkbuild_package_cache
-          # The heavy stage is the ~1h qemu-emulated debootstrap. dArkOS caches
-          # the finished rootfs to Arkbuild_package_cache/debian_<suite>_rootfs
-          # .tar.gz and reuses it when its recorded Debian version still matches
-          # stable, so persisting this dir skips debootstrap on a hit. run_id in
-          # the save key means a fresh rootfs (after a Debian point release forces
-          # a re-debootstrap) is saved as a new entry; restore-keys picks the most
+          # dArkOS reuses Arkbuild_package_cache/debian_<suite>_rootfs.tar.gz when
+          # its recorded Debian version still matches stable, so a hit here skips
+          # debootstrap. run_id keeps each save a fresh entry (so a re-debootstrap
+          # after a Debian point release is captured); restore-keys picks the most
           # recent. Correctness is the build's own .commit check, not the key.
           key: darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-${{ github.run_id }}
           restore-keys: |
             darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-
             darkmoss-rootfs-
 
-      - name: Cache the aarch64 toolchain
-        uses: actions/cache@v4
+      - name: Restore the aarch64 toolchain cache
+        id: toolchain-cache
+        uses: actions/cache/restore@v4
         with:
-          # The Linaro toolchain never changes, so a fixed key: saved once,
-          # restored forever. Kept in the workspace so actions/cache (which runs
-          # as the runner, not root) can persist it.
+          # Immutable toolchain, fixed key: saved once, restored forever. Kept in
+          # the workspace so the runner-user cache can persist it.
           path: .toolchain-cache
           key: darkmoss-toolchain-linaro-6.3.1-2017.05
 
@@ -138,6 +142,24 @@ jobs:
             exit 1
           fi
           echo "image(s) produced:"; ls -lh *.img.7z*
+
+      # Save the caches even when the build failed (but not when cancelled), so a
+      # run that dies at the kernel or finishing_touches still seeds the ~1h
+      # rootfs for the next iteration. Gated on the tarball actually existing, so
+      # a failure DURING debootstrap cannot poison the cache with a partial.
+      - name: Save the debootstrap rootfs cache
+        if: ${{ !cancelled() && hashFiles('Arkbuild_package_cache/*_rootfs.tar.gz') != '' }}
+        uses: actions/cache/save@v4
+        with:
+          path: Arkbuild_package_cache
+          key: darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-${{ github.run_id }}
+
+      - name: Save the aarch64 toolchain cache
+        if: ${{ !cancelled() && steps.toolchain-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: .toolchain-cache
+          key: darkmoss-toolchain-linaro-6.3.1-2017.05
 
       - name: Upload image artifact
         if: success()
