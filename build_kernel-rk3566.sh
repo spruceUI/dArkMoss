@@ -7,14 +7,14 @@ if [ ! -d "$KERNEL_SRC" ]; then
 fi
 cd $KERNEL_SRC
 # Change the boot logo depending on the device
-if [[ -e "../logos/unrotated/dArkos${UNIT}.png" ]]; then
+if [[ -e "../logos/unrotated/dArkMoss${UNIT}.png" ]]; then
   apt list --installed 2>/dev/null | grep -q "netpbm"
   if [[ $? != "0" ]]; then
     sudo apt -y update
     sudo apt -y install netpbm
   fi	
-  pngtopnm ../logos/unrotated/dArkos${UNIT}.png | ppmquant 224 | pnmnoraw > drivers/video/logo/logo_linux_clut224.ppm
-  pngtopnm ../logos/unrotated/dArkoshdmi.png | ppmquant 224 | pnmnoraw > drivers/video/logo/logo_hdmi_clut224.ppm
+  pngtopnm ../logos/unrotated/dArkMoss${UNIT}.png | ppmquant 224 | pnmnoraw > drivers/video/logo/logo_linux_clut224.ppm
+  pngtopnm ../logos/unrotated/dArkMosshdmi.png | ppmquant 224 | pnmnoraw > drivers/video/logo/logo_hdmi_clut224.ppm
 fi
 
 make ARCH=arm64 rk3566_optimized_linux_defconfig
