@@ -60,17 +60,21 @@ PermitRootLogin yes
 PasswordAuthentication yes
 EOF
 
-    # dArkOS ships SSH off and expects its Remote Services tool to turn it on.
-    # spruce manages it from Network Settings instead, so have the unit present
-    # and disabled rather than absent - starting it is then a systemctl call
-    # with no key generation or first-run surprise.
-    systemctl disable ssh.service 2>/dev/null || true
+    # Host keys at build time, so turning SSH on is never a first-run surprise.
     ssh-keygen -A >/dev/null 2>&1 || true
 
-    # spruce toggles SSH with "systemctl start sshd", the name every other
-    # platform it supports uses. Debian calls the unit ssh.service and ships no
-    # alias, so provide one here rather than teaching spruce a per-distro name.
-    ln -sf /lib/systemd/system/ssh.service /etc/systemd/system/sshd.service
+    # Debian 13 runs SSH socket-activated: ssh.socket listens and spawns
+    # sshd@.service per connection. Do NOT enable ssh.service alongside it -
+    # the two conflict, and the result is a socket that answers with a banner
+    # and then resets the connection during key exchange, which reads like a
+    # broken host key rather than a unit conflict. Learned the hard way.
+    #
+    # Nothing else to do here: spruce asks for the unit by the name this
+    # platform reports from get_ssh_service_name, which is "ssh", so no alias
+    # is needed and systemd's own arrangement is left alone. SSH stays off
+    # until spruce turns it on from Network Settings, as dArkOS shipped it.
+    systemctl disable ssh.service 2>/dev/null || true
+    systemctl disable ssh.socket 2>/dev/null || true
 '
 
 # Stamp an identifier spruce's platform detection keys off. The RGB30 shares its
