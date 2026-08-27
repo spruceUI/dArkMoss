@@ -7,6 +7,20 @@ Conflicts=emulationstation.service
 
 [Service]
 Type=idle
+
+# Kill only runtime.sh on stop, not the whole cgroup.
+#
+# spruce shuts the device down from save_poweroff.sh, which runs as a
+# descendant of runtime.sh and, by design, kills runtime.sh on its way past.
+# Under the default KillMode=control-group systemd sees the MainPID exit and
+# kills every remaining process in the cgroup - including save_poweroff.sh
+# itself, several steps before it reaches the poweroff. The unit deactivates
+# cleanly, the device stays on, and nothing in the log says why: the script's
+# last line is simply the last thing it managed to write.
+#
+# The frontend's children legitimately outlive it during shutdown, so process
+# is the honest mode here.
+KillMode=process
 ExecStartPre=/usr/local/sbin/mount-spruce.sh
 # runtime.sh is spruce's own entry point; it detects the platform (RGB30 here)
 # and runs its main loop. Runs as root - spruce does its own mounts and touches
