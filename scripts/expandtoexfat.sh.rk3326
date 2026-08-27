@@ -126,7 +126,7 @@ fi
 	fi
 	sudo rm -f /boot/fstab.exfat &> /dev/null
 	echo 100
-) | dialog --title "Firstboot setup of dArkOS" --gauge "Expanding rootfs and exfat partitions.  Please wait..." $height $width 0 2>&1 > /dev/tty1
+) | dialog --title "Firstboot setup of dArkMoss" --gauge "Expanding rootfs and exfat partitions.  Please wait..." $height $width 0 2>&1 > /dev/tty1
 
 exitcode=$(cat /tmp/code.txt)
 if [ "$exitcode" == "0" ]; then
