@@ -173,11 +173,32 @@ if [[ "${ENABLE_CACHE}" == "y" ]]; then
   sudo sed -i '/127.0.0.1:3142\//s///' Arkbuild/etc/apt/sources.list
 fi
 
-call_chroot "ln -sfv /usr/lib/aarch64-linux-gnu/libSDL2.so /usr/lib/aarch64-linux-gnu/libSDL2-2.0.so.0"
-call_chroot "ln -sfv /usr/lib/aarch64-linux-gnu/libSDL2-2.0.so.0.${extension} /usr/lib/aarch64-linux-gnu/libSDL2.so"
+# Point the SDL2 soname at whichever build actually landed in the image.
+#
+# This used to interpolate ${extension}, which is only ever set in
+# build_sdl2.sh and is unset here, so it expanded to nothing and produced
+#   libSDL2-2.0.so.0 -> libSDL2.so -> libSDL2-2.0.so.0.
+# with the version cut off. The whole chain dangled, and every binary that
+# links SDL2 at load time - RetroArch among them - died with "libSDL2-2.0.so.0:
+# cannot open shared object file". PyUI hid it by bundling its own copy.
+#
+# Resolve the real filename by globbing Arkbuild from the host rather than
+# inside the chroot: call_chroot embeds its argument in host-side double
+# quotes, so any $ in it expands here anyway.
+link_sdl2_soname() {
+  _libdir="$1"
+  _real="$(basename "$(ls Arkbuild${_libdir}/libSDL2-2.0.so.0.*.* 2>/dev/null | head -n 1)" 2>/dev/null)"
+  if [ -z "${_real}" ]; then
+    echo "WARNING: no libSDL2-2.0.so.0.* under ${_libdir}; leaving SDL2 symlinks alone"
+    return
+  fi
+  call_chroot "ln -sfnv ${_libdir}/${_real} ${_libdir}/libSDL2-2.0.so.0"
+  call_chroot "ln -sfnv libSDL2-2.0.so.0 ${_libdir}/libSDL2.so"
+}
+
+link_sdl2_soname /usr/lib/aarch64-linux-gnu
 if [[ "${BUILD_ARMHF}" == "y" ]]; then
-  call_chroot "ln -sfv /usr/lib/arm-linux-gnueabihf/libSDL2.so /usr/lib/arm-linux-gnueabihf/libSDL2-2.0.so.0"
-  call_chroot "ln -sfv /usr/lib/arm-linux-gnueabihf/libSDL2-2.0.so.0.${extension} /usr/lib/arm-linux-gnueabihf/libSDL2.so"
+  link_sdl2_soname /usr/lib/arm-linux-gnueabihf
 fi
 # Ensure sdl2-config is linked to the proper version
 call_chroot "ln -sfv /usr/lib/aarch64-linux-gnu/bin/sdl2-config /usr/bin/sdl2-config"
