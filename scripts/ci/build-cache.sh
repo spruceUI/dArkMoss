@@ -44,17 +44,66 @@ bc_remote_sha() {
     git ls-remote "$1" "${2:-HEAD}" 2>/dev/null | awk '{print $1; exit}'
 }
 
+# A GitHub release asset caps at 2GB. The prepared chroot came out at 1998MB -
+# it fit with 50MB to spare, and one more package would have pushed it over,
+# silently, because this cache fails soft. So anything past the threshold is
+# split across numbered part assets and reassembled on the way back in, the same
+# way the finished image is published.
+BUILD_CACHE_SPLIT_MB="${BUILD_CACHE_SPLIT_MB:-1500}"
+
 # bc_fetch <asset-name> <dest-path>
+#
+# Tries the whole asset first, then a split set. A split set is only trusted if
+# its manifest is present and the reassembled sha256 matches - a half-uploaded
+# set has to look like a miss, not like a corrupt tarball, or the caller extracts
+# garbage over a good chroot.
 bc_fetch() {
     bc_available || { echo "build-cache: unavailable, building normally"; return 1; }
     local asset="$1" dest="$2"
     rm -f "$dest"
+
     if gh release download "$BUILD_CACHE_TAG" --repo "$BUILD_CACHE_REPO" \
             --pattern "$asset" --output "$dest" --clobber >/dev/null 2>&1 \
        && [ -s "$dest" ]; then
         echo "build-cache: HIT  $asset"
         return 0
     fi
+
+    local mdir manifest parts want_sha i part got_sha
+    mdir="$(mktemp -d)"
+    if gh release download "$BUILD_CACHE_TAG" --repo "$BUILD_CACHE_REPO" \
+            --pattern "${asset}.manifest" --output "$mdir/manifest" --clobber >/dev/null 2>&1 \
+       && [ -s "$mdir/manifest" ]; then
+        parts="$(grep '^parts=' "$mdir/manifest" | cut -d= -f2)"
+        want_sha="$(grep '^sha256=' "$mdir/manifest" | cut -d= -f2)"
+        if [ -n "$parts" ] && [ -n "$want_sha" ]; then
+            echo "build-cache: $asset is split into $parts parts, fetching"
+            i=0
+            while [ "$i" -lt "$parts" ]; do
+                part="$(printf '%s.part%03d' "$asset" "$i")"
+                if ! gh release download "$BUILD_CACHE_TAG" --repo "$BUILD_CACHE_REPO" \
+                        --pattern "$part" --output "$mdir/$part" --clobber >/dev/null 2>&1 \
+                   || [ ! -s "$mdir/$part" ]; then
+                    echo "build-cache: part $part missing - treating as a miss"
+                    rm -rf "$mdir"; rm -f "$dest"
+                    return 1
+                fi
+                i=$((i + 1))
+            done
+            cat "$mdir"/"$asset".part[0-9][0-9][0-9] > "$dest" 2>/dev/null
+            got_sha="$(sha256sum "$dest" | cut -d' ' -f1)"
+            rm -rf "$mdir"
+            if [ "$got_sha" = "$want_sha" ]; then
+                echo "build-cache: HIT  $asset (reassembled, sha ok)"
+                return 0
+            fi
+            echo "build-cache: reassembled $asset failed its checksum - treating as a miss"
+            rm -f "$dest"
+            return 1
+        fi
+    fi
+    rm -rf "$mdir"
+
     echo "build-cache: MISS $asset"
     rm -f "$dest"
     return 1
@@ -77,16 +126,48 @@ bc_publish() {
             --latest=false >/dev/null 2>&1 || true
     fi
 
-    local stage
-    stage="$(mktemp -d)/$asset"
-    mkdir -p "$(dirname "$stage")"
-    cp -f "$file" "$stage" || return 0
-    if gh release upload "$BUILD_CACHE_TAG" --repo "$BUILD_CACHE_REPO" \
-            "$stage" --clobber >/dev/null 2>&1; then
-        echo "build-cache: published $asset ($(du -h "$stage" | cut -f1))"
-    else
-        echo "build-cache: could not publish $asset - continuing"
+    local size_mb stagedir
+    size_mb="$(du -m "$file" | cut -f1)"
+    stagedir="$(mktemp -d)"
+
+    if [ "$size_mb" -le "$BUILD_CACHE_SPLIT_MB" ]; then
+        cp -f "$file" "$stagedir/$asset" || { rm -rf "$stagedir"; return 0; }
+        if gh release upload "$BUILD_CACHE_TAG" --repo "$BUILD_CACHE_REPO" \
+                "$stagedir/$asset" --clobber >/dev/null 2>&1; then
+            echo "build-cache: published $asset (${size_mb}MB)"
+        else
+            echo "build-cache: could not publish $asset - continuing"
+        fi
+        rm -rf "$stagedir"
+        return 0
     fi
-    rm -rf "$(dirname "$stage")"
+
+    # Too big for one asset. Split, upload the parts, and only then upload the
+    # manifest - it is what bc_fetch trusts, so it must not exist until every
+    # part it names does. An interrupted publish then reads as a miss.
+    echo "build-cache: $asset is ${size_mb}MB, splitting at ${BUILD_CACHE_SPLIT_MB}MB"
+    split -b "${BUILD_CACHE_SPLIT_MB}m" -d -a 3 "$file" "$stagedir/${asset}.part" || {
+        rm -rf "$stagedir"; return 0; }
+
+    local nparts sha
+    nparts="$(ls -1 "$stagedir/${asset}.part"* 2>/dev/null | wc -l)"
+    sha="$(sha256sum "$file" | cut -d' ' -f1)"
+    if [ "$nparts" -lt 1 ]; then rm -rf "$stagedir"; return 0; fi
+
+    if ! gh release upload "$BUILD_CACHE_TAG" --repo "$BUILD_CACHE_REPO" \
+            "$stagedir/${asset}.part"* --clobber >/dev/null 2>&1; then
+        echo "build-cache: could not publish the parts of $asset - continuing"
+        rm -rf "$stagedir"
+        return 0
+    fi
+
+    printf 'parts=%s\nsha256=%s\n' "$nparts" "$sha" > "$stagedir/${asset}.manifest"
+    if gh release upload "$BUILD_CACHE_TAG" --repo "$BUILD_CACHE_REPO" \
+            "$stagedir/${asset}.manifest" --clobber >/dev/null 2>&1; then
+        echo "build-cache: published $asset as $nparts parts (${size_mb}MB)"
+    else
+        echo "build-cache: parts uploaded but manifest failed - next build will treat it as a miss"
+    fi
+    rm -rf "$stagedir"
     return 0
 }
