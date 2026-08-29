@@ -156,8 +156,32 @@ if [[ "${BUILD_ARMHF}" == "y" ]]; then
   rm -f libasound2_1.2.8-1+b1_armhf.deb
 fi
 
+MALI_LIBS="libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so libOpenCL.so libOpenCL.so.1 libwayland-egl.so libwayland-egl.so.1 libwayland-egl.so.1.0.0"
+
+# Divert the dpkg-owned names before overwriting them with Mali symlinks.
+#
+# Several of these files belong to real packages - libEGL.so.1 to libegl1,
+# libgbm.so.1 to libgbm1, and so on. Replacing them with symlinks and leaving
+# no diversion means any later apt operation that reinstalls or upgrades those
+# packages silently restores the Mesa files on top, and the GLES stack is gone:
+# the Mali blob is the only real GL path on this kernel (there is no panfrost
+# driver, so Mesa can only reach llvmpipe). The failure is invisible until
+# something tries to make a window.
+#
+# A diversion makes dpkg write the package's copy to <name>.distrib instead, so
+# the symlink survives. Ask dpkg which names it actually owns rather than
+# hardcoding the list - it moves between Debian releases.
+call_chroot "
+  for LIB in ${MALI_LIBS}; do
+    TARGET=/usr/lib/aarch64-linux-gnu/\${LIB}
+    if dpkg -S \${TARGET} >/dev/null 2>&1; then
+      dpkg-divert --divert \${TARGET}.distrib --rename --add \${TARGET} >/dev/null
+    fi
+  done
+"
+
 cd Arkbuild/usr/lib/aarch64-linux-gnu
-for LIB in libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so libOpenCL.so libOpenCL.so.1 libwayland-egl.so libwayland-egl.so.1 libwayland-egl.so.1.0.0
+for LIB in ${MALI_LIBS}
 do
   sudo rm -fv ${LIB}
   sudo ln -sfv libMali.so ${LIB}
@@ -211,7 +235,9 @@ if grep -qs "Arkbuild/home/ark/Arkbuild_ccache" /proc/mounts; then
   sudo umount -l Arkbuild/home/ark/Arkbuild_ccache
 fi
 sudo rm -rf Arkbuild/home/ark/Arkbuild_ccache
-sudo rm -rf Arkbuild/var/log/journal
+# NOT removing /var/log/journal - see setup_spruce_handoff-rk3566.sh. A
+# persistent journal is the difference between debugging this device from a log
+# and debugging it by swapping cards, and it is capped at 64M.
 sudo rm Arkbuild/usr/sbin/policy-rc.d
 sudo rm -f Arkbuild/etc/resolv.conf
 sudo rm -f Arkbuild/etc/network/interfaces

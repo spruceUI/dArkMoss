@@ -1,0 +1,16 @@
+[Unit]
+Description=Export dArkMoss debug logs to the boot partition
+# The flag file is the on switch; without it the unit does not even start.
+# systemd re-evaluates this every boot, so dropping the file on the card from a
+# PC is enough to turn logging on or off.
+ConditionPathExists=/boot/darkmoss-debug
+# After the journal has been flushed to disk, or "previous boot" is not there
+# to read yet.
+After=systemd-journal-flush.service multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/darkmoss-debug.sh
+
+[Install]
+WantedBy=multi-user.target

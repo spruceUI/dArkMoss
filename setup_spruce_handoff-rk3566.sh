@@ -77,6 +77,43 @@ EOF
     systemctl disable ssh.socket 2>/dev/null || true
 '
 
+# --- logging ---------------------------------------------------------------
+# Two layers, because they answer different questions.
+#
+# Always on: a persistent journal. Upstream deletes /var/log/journal in
+# cleanup_filesystem.sh, so this device forgets everything at every reboot -
+# which on a handheld we debug by pulling the card has cost whole sessions, the
+# GBM/EGL hunt among them. Capped at 64M so it cannot eat the rootfs or thrash
+# the card.
+echo -e "Enabling the persistent journal...\n\n"
+sudo mkdir -p Arkbuild/var/log/journal
+sudo mkdir -p Arkbuild/etc/systemd/journald.conf.d
+cat <<EOF | sudo tee Arkbuild/etc/systemd/journald.conf.d/10-darkmoss.conf >/dev/null
+# dArkMoss: keep logs across reboots, but bounded. See darkmoss-debug.sh for
+# getting them off the card without SSH.
+[Journal]
+Storage=persistent
+SystemMaxUse=64M
+SystemMaxFileSize=8M
+SystemMaxFiles=8
+EOF
+
+# Opt in: export those logs to /boot as plain text. /boot is the FAT partition,
+# so "turn on logging" is creating an empty file on the card from any PC and
+# "read the logs" is opening /boot/logs on the same PC. Gated behind the flag
+# because writing to /boot on a device with an unclean shutdown path is a real
+# risk, and a dirty /boot does not boot.
+sudo cp scripts/spruce/darkmoss-debug.sh Arkbuild/usr/local/sbin/darkmoss-debug.sh
+sudo chmod 0755 Arkbuild/usr/local/sbin/darkmoss-debug.sh
+sudo cp scripts/spruce/darkmoss-debug.service Arkbuild/etc/systemd/system/darkmoss-debug.service
+# Enabled, but inert: the unit's ConditionPathExists means it does nothing at
+# all until /boot/darkmoss-debug exists, and systemd re-checks every boot.
+sudo chroot Arkbuild/ bash -c "systemctl enable darkmoss-debug.service"
+
+# The user-facing README for this lives on the FAT partition and is written in
+# finishing_touches-rk3566.sh, which is the last place p3 is still mounted.
+# --- end logging -----------------------------------------------------------
+
 # Stamp an identifier spruce's platform detection keys off. The RGB30 shares its
 # cpuinfo signature (0xd05) with the Miyoo Flip, so spruce reads os-release to
 # tell them apart. spruce's helperFunctions.sh must match DARKMOSS in its 0xd05
