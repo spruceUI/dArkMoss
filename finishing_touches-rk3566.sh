@@ -135,6 +135,10 @@ recent runs are kept.
 
 To stop collecting: delete the "darkmoss-debug" file. The logs folder can be
 deleted at any time.
+
+Note: while the "darkmoss-debug" file is present the text console is also left
+on the screen, so kernel messages and any panic are visible. Without it the
+console is detached and the display belongs to the frontend.
 EOF
 
 # Disable getty on tty0 and tty1

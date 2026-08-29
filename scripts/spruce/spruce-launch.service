@@ -22,6 +22,12 @@ Type=idle
 # is the honest mode here.
 KillMode=process
 ExecStartPre=/usr/local/sbin/mount-spruce.sh
+# Detach fbcon from the panel so the console cannot show through during the
+# handoffs between PyUI and a game. Ordered here rather than at boot on purpose:
+# boot messages stay visible, and only the frontend's own transitions go clean.
+# Honours the /boot/darkmoss-debug flag. Non-fatal - the dash makes systemd
+# ignore a failure, because a cosmetic fix must not stop the frontend starting.
+ExecStartPre=-/usr/local/sbin/console-blank.sh
 # runtime.sh is spruce's own entry point; it detects the platform (RGB30 here)
 # and runs its main loop. Runs as root - spruce does its own mounts and touches
 # hardware directly.
@@ -29,7 +35,14 @@ ExecStart=/bin/sh -lc 'exec /mnt/SDCARD/spruce/scripts/runtime.sh'
 Restart=on-failure
 RestartSec=3
 StandardInput=tty
-StandardOutput=tty
+# NOT tty. With TTYPath=/dev/tty1 below, every echo and log_message from
+# runtime.sh and everything it calls was printed straight onto the panel, so
+# each game launch and exit flashed a wall of spruce narrating its own scripts.
+# The journal keeps all of it and costs nothing now that dArkMoss ships a
+# persistent one (64M cap, see setup_spruce_handoff-rk3566.sh) - journalctl has
+# it, and darkmoss-debug.sh exports it to /boot/logs for reading off the card.
+# stdin stays on the tty: the frontend still needs the VT for DRM and input.
+StandardOutput=journal
 StandardError=journal
 TTYPath=/dev/tty1
 TTYReset=yes

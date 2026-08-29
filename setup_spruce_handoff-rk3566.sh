@@ -11,6 +11,11 @@ echo -e "Wiring the spruce hand-off...\n\n"
 # The TF2 mount helper and the launcher unit.
 sudo cp scripts/spruce/mount-spruce.sh Arkbuild/usr/local/sbin/mount-spruce.sh
 sudo chmod 0755 Arkbuild/usr/local/sbin/mount-spruce.sh
+
+# Detaches fbcon from the panel so the console cannot show through between the
+# frontend and a game. Run as an ExecStartPre of the unit below.
+sudo cp scripts/spruce/console-blank.sh Arkbuild/usr/local/sbin/console-blank.sh
+sudo chmod 0755 Arkbuild/usr/local/sbin/console-blank.sh
 sudo cp scripts/spruce/spruce-launch.service Arkbuild/etc/systemd/system/spruce-launch.service
 
 # spruce expects the card at /mnt/SDCARD; mount-spruce.sh mounts TF2 there.
