@@ -1,19 +1,20 @@
 #!/bin/bash
-if mountpoint -q /roms; then
-  sudo umount /roms
-fi
-primary_block_partition=$(df -T | grep mmcblk[0-1]p4 | cut -d '/' -f 3 | cut -d ' ' -f 1)
-primary_block=${primary_block_partition:0:7}
-sudo ln -s /dev/${primary_block}p5 /dev/hda3
+# Firstboot: grow the rootfs into the rest of the card.
+#
+# Upstream dArkOS did far more here - deleted p5, capped the rootfs at 11GB,
+# recreated p5 across everything left, mkfs.exfat'd it as EASYROMS, mounted it,
+# untarred an EmulationStation ROM tree and a pile of themes onto it, then
+# rebooted. spruce is the frontend, it lives on TF2, and nothing on this image
+# reads /roms, so all of that is gone along with the partition itself (see
+# setup_partition-rk3566.sh). TF1 is boot + rootfs, and the rootfs takes the
+# whole card.
+#
+# Kept: the console font/dialog setup, so a user watching the screen still sees
+# what is happening on first boot rather than a blank tty.
 sudo chmod 666 /dev/tty1
 export TERM=linux
 height="15"
 width="55"
-if [ -f "/boot/rk3326-a10mini-linux.dtb" ] || [ -f "/boot/rk3326-rg351v-linux.dtb" ] || [ -f "/boot/rk3326-rg351mp-linux.dtb" ] || [ -f "/boot/rk3326-gameforce-linux.dtb" ] || [ -f "/boot/rk3326-odroidgo3-linux.dtb" ]; then
-  sudo setfont /usr/share/consolefonts/Lat7-Terminus20x10.psf.gz
-  height="20"
-  width="60"
-fi
 if compgen -G "/boot/rk3566*" > /dev/null; then
   if test ! -z "$(cat /home/ark/.config/.DEVICE | grep RGB20PRO | tr -d '\0')"
   then
@@ -24,135 +25,50 @@ if compgen -G "/boot/rk3566*" > /dev/null; then
   height="20"
   width="60"
 fi
-#if [ ! -f "/boot/doneit" ]; then 
-  #sudo touch "/boot/doneit"
-  dialog --infobox "EASYROMS partition expansion and conversion to exfat in process.  Please wait..." $height $width 2>&1 > /dev/tty1 
-  sleep 5
-  #reboot
-#fi
 
+primary_block_partition=$(df -T | grep mmcblk[0-1]p4 | cut -d '/' -f 3 | cut -d ' ' -f 1)
+primary_block=${primary_block_partition:0:7}
+partition_type=$(df -T | grep mmcblk[0-1]p4 | cut -d ' ' -f 2)
+
+exitcode=1
 (
-	maxSize=$(lsblk -b --output SIZE -n -d /dev/${primary_block})
-
-	newExtSizePct=$(printf %.2f "$((10**4 * 11000000000/$maxSize))e-4")
-	newExtSizePct=$(echo print 1-$newExtSizePct | perl)
-	ExfatPctToRemain=$(echo print 100*$newExtSizePct | perl)
-
-	#echo "$ExfatPctToRemain" > /home/ark/growpercentage.log
-
-	# Expand the rootfs partition if possible to make room for future update needs
-	partition_type=$(df -T | grep mmcblk[0-1]p4 | cut -d ' ' -f 2)
-	if [ $ExfatPctToRemain -lt "100" ]; then
-	  printf "d\n5\nw\n" | sudo fdisk /dev/${primary_block} &> /dev/null
-	  sudo growpart --free-percent=$ExfatPctToRemain -v /dev/${primary_block} 4 &> /dev/null
-	  if [[ "$partition_type" == *"ext"* ]]; then
+	echo 10
+	# No --free-percent: the rootfs is the last partition now, so plain
+	# growpart takes it to the end of the card. This also relocates the
+	# backup GPT header, which sits at the end of the 7.5G image rather
+	# than the end of the user's card until something moves it.
+	sudo growpart -v /dev/${primary_block} 4 &> /dev/null
+	echo 40
+	if [[ "$partition_type" == *"ext"* ]]; then
 		sudo resize2fs /dev/${primary_block}p4 &> /dev/null
-	  elif [[ "$partition_type" == *"xfs"* ]]; then
+		echo $? > /tmp/code.txt
+	elif [[ "$partition_type" == *"xfs"* ]]; then
 		sudo xfs_growfs /dev/${primary_block}p4 &> /dev/null
-	  elif [[ "$partition_type" == *"btrfs"* ]]; then
+		echo $? > /tmp/code.txt
+	elif [[ "$partition_type" == *"btrfs"* ]]; then
 		sudo btrfs filesystem resize max / &> /dev/null
-	  else
+		echo $? > /tmp/code.txt
+	else
 		echo "Don't know how to grow a $partition_type file system."
-		echo ""
-	  fi
-	  echo 30
-	  printf "n\n5\n\n\nt\n5\n11\nw\n" | sudo fdisk /dev/${primary_block} &> /dev/null
-	  echo 45
+		echo 1 > /tmp/code.txt
 	fi
-
-	sudo mkfs.exfat -c 16K -L EASYROMS /dev/hda3 &> /dev/null
-	exitcode=$?
-	echo $exitcode > /tmp/code.txt
+	echo 80
 	sync
-	echo 50
-	sleep 2
-	sudo fsck.exfat -a /dev/hda3 &> /dev/null
-	sync
-	echo 55
-	sleep 2
-	sudo mount -t exfat -w /dev/${primary_block}p5 /roms &> /dev/null
-	sleep 2
-	#sudo tar -xf /roms.tar -C / &> /dev/null
-	(pv -n /roms.tar | tar --no-same-permissions --no-same-owner --warning=no-timestamp -xf - -C /) &> /tmp/tar_stat.txt &
-	let COUNT=1
-	while true; do
-	  VAL=$(tail -n 1 /tmp/tar_stat.txt)
-	  if [[ "$VAL" == "100" ]]; then
-	   VAL_INT=$(awk "BEGIN {print ($VAL / 100) * 20 + 60}" 2> /dev/null | cut -d '.' -f1)
-	   echo $VAL_INT
-	   break
-	  elif [[ "$VAL" != "$SAMEVAL" ]]; then
-	   VAL_INT=$(awk "BEGIN {print ($VAL / 100) * 20 + 60}" 2> /dev/null | cut -d '.' -f1)
-	   echo $VAL_INT
-	   SAMEVAL="$VAL"
-	   continue
-	  elif [[ $COUNT -ge 10000 ]]; then
-	   echo "We're failing out for creating roms structure."
-	   break
-	  else
-	   let COUNT++
-	   continue
-	  fi
-	done
-	sync
-	#echo 80
-	reqSpace=1000000
-	availSpace=$(df "/roms" | awk 'NR==2 { print $4 }')
-	if (( availSpace < reqSpace )); then
-	  sudo rm -rf /tempthemes/es-theme-epic-cody*/ &> /dev/null
-	fi
-	cd /tempthemes
-	(tar --no-same-permissions --no-same-owner --warning=no-timestamp -cf - . | pv -n -s $(du -sb /tempthemes/ | awk '{print $1}') | tar --no-same-permissions --no-same-owner -xf - -C /roms/themes/) &> /tmp/tar_stat.txt &
-	let COUNT=1
-	while true; do
-	  VAL=$(tail -n 1 /tmp/tar_stat.txt)
-	  if [[ "$VAL" -ge "100" ]]; then
-	   VAL_INT_CP=$(awk "BEGIN {print ($VAL / 100) * 15 + 80}" 2> /dev/null | cut -d '.' -f1)
-	   echo $VAL_INT_CP
-	   break
-	  elif [[ "$VAL" != "$SAMEVAL" ]] && [[ ! -z "$VAL" ]]; then
-	   VAL_INT_CP=$(awk "BEGIN {print ($VAL / 100) * 15 + 80}" 2> /dev/null | cut -d '.' -f1)
-	   echo $VAL_INT_CP
-	   SAMEVAL="$VAL"
-	   continue
-	  elif [[ $COUNT -ge 10000 ]]; then
-	   echo "We're failing out for copying themes."
-	   break
-	  else
-	   let COUNT++
-	   continue
-	  fi
-	done
-	sync
-	#echo 95
-	sleep 1
-	cd ..
-	while true; do
-	  if [[ -z $(pidof tar) ]]; then
-		sudo rm -rf /tempthemes &> /dev/null
-		break
-	  fi
-	done
-	sleep 2
-	sudo umount /roms &> /dev/null
 	sudo cp -f /boot/fstab.exfat /etc/fstab &> /dev/null
-	sync
 	sudo rm -f /boot/doneit &> /dev/null
 	sudo rm -f /boot/fstab.exfat &> /dev/null
+	sync
 	echo 100
-) | dialog --title "Firstboot setup of dArkMoss" --gauge "Expanding rootfs and exfat partitions.  Please wait..." $height $width 0 2>&1 > /dev/tty1
+) | dialog --title "Firstboot setup of dArkMoss" --gauge "Expanding the root filesystem.  Please wait..." $height $width 0 2>&1 > /dev/tty1
 
 exitcode=$(cat /tmp/code.txt)
+systemctl disable firstboot.service &> /dev/null
+sudo rm -f /boot/firstboot.sh &> /dev/null
+sudo rm -- "$0" &> /dev/null
+
 if [ "$exitcode" == "0" ]; then
-  systemctl disable firstboot.service &> /dev/null
-  sudo rm /boot/firstboot.sh &> /dev/null
-  sudo rm -- "$0"
-  dialog --infobox "Completed expansion of root filesystem and EASYROMS partition and conversion to exfat. The system will now reboot and load dArkOS." $height $width 2>&1 > /dev/tty1 | sleep 10
-  reboot
+  dialog --infobox "Root filesystem expanded. The system will now reboot into dArkMoss." $height $width 2>&1 > /dev/tty1 | sleep 5
 else
-  dialog --infobox "EASYROMS partition expansion and conversion to exfat failed for an unknown reason.  Please expand the partition using an alternative tool such as Minitool Partition Wizard.  System will reboot and load dArkOS now." $height $width 2>&1 > /dev/tty1 | sleep 10
-  systemctl disable firstboot.service &> /dev/null
-  sudo rm /boot/firstboot.sh &> /dev/null
-  sudo rm -- "$0"
-  reboot
+  dialog --infobox "Root filesystem expansion failed. dArkMoss will still boot - the rootfs just will not use the whole card. The system will now reboot." $height $width 2>&1 > /dev/tty1 | sleep 10
 fi
+reboot

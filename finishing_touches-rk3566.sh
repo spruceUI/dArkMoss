@@ -105,7 +105,8 @@ sudo chroot Arkbuild/ bash -c "systemctl disable killer_daemon"
 # Add amiga script
 sudo cp amiga/amiga.sh Arkbuild/usr/local/bin/
 
-#Generate fstab to be used after EASYROMS expansion
+#Generate the post-firstboot fstab. No /roms line and no /opt/system/Tools bind:
+#there is no EASYROMS partition on this image - see the strip note below.
 if [ "$ROOT_FILESYSTEM_FORMAT" == "btrfs" ]; then
   ROOT_FILESYSTEM_MOUNT_OPTIONS="${ROOT_FILESYSTEM_MOUNT_OPTIONS},ssd_spread"
 fi
@@ -113,8 +114,27 @@ cat <<EOF | sudo tee ${mountpoint}/fstab.exfat
 /dev/mmcblk1p4  /  ${ROOT_FILESYSTEM_FORMAT} ${ROOT_FILESYSTEM_MOUNT_OPTIONS} 0 0
 
 /dev/mmcblk1p3 /boot vfat defaults,noatime 0 0
-/dev/mmcblk1p5 /roms exfat defaults,auto,umask=000,uid=1000,gid=1000,noatime 0 0
-/roms/tools /opt/system/Tools none nofail,x-systemd.device-timeout=7,bind
+EOF
+
+# Logging README, on the FAT partition because that is the only thing on TF1 a
+# user with a card reader and no Linux box can read. The service and the
+# journald config that back this are installed in setup_spruce_handoff-rk3566.sh;
+# this is the last point in the build where p3 is still mounted, so the file has
+# to be written here.
+cat <<EOF | sudo tee ${mountpoint}/README-logging.txt >/dev/null
+dArkMoss logging
+================
+
+To collect logs: create an empty file named "darkmoss-debug" in this folder
+(no extension), put the card back in the device and boot it.
+
+Each boot then writes a timestamped folder inside a "logs" folder here,
+containing the previous boot's log, this boot's log, dmesg, a system summary,
+and spruce's own log if the spruce card was mounted in time. The five most
+recent runs are kept.
+
+To stop collecting: delete the "darkmoss-debug" file. The logs folder can be
+deleted at any time.
 EOF
 
 # Disable getty on tty0 and tty1
@@ -408,105 +428,20 @@ fi
 # Set the ownver of the ark folder and all sub content to ark
 sudo chroot Arkbuild/ bash -c "chown -R ark:ark /home/ark"
 
-# Clone some themes to the tempthemes folder
-sudo mkdir Arkbuild/tempthemes
-if [ "$UNIT" == "rgb30" ]; then
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-freeplay.git Arkbuild/tempthemes/es-theme-freeplay
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-sagabox.git Arkbuild/tempthemes/es-theme-sagabox
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-switch.git Arkbuild/tempthemes/es-theme-switch
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-simply-basic.git Arkbuild/tempthemes/es-theme-simply-basic
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-sagamodern.git Arkbuild/tempthemes/es-theme-sagamodern
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-saganx.git Arkbuild/tempthemes/es-theme-saganx
-  sudo git clone --depth=1 https://github.com/dani7959/es-theme-replica.git Arkbuild/tempthemes/es-theme-replica
-else
-  if [[ "$UNIT" == *"rgb10"* ]] || [[ "$UNIT" == "rk2020" ]] || [[ "$UNIT" == *"oga"* ]]; then
-    sudo git clone --depth=1 https://github.com/pix33l/es-theme-pixui.git
-  fi
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-freeplay.git Arkbuild/tempthemes/es-theme-freeplay
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-minimal-arkos.git Arkbuild/tempthemes/es-theme-minimal-arkos
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-nes-box.git Arkbuild/tempthemes/es-theme-nes-box
-  sudo git clone --depth=1 https://github.com/Jetup13/es-theme-switch.git Arkbuild/tempthemes/es-theme-switch
-  sudo git clone --depth=1 https://github.com/dani7959/es-theme-replica.git Arkbuild/tempthemes/es-theme-replica
-fi
+# --- dArkMoss strip: no EmulationStation, no EASYROMS ----------------------
+# Upstream built an ES ROM tree here (game_systems.txt directories, the
+# PortMaster and ThemeMaster installers, sample pico-8 carts, launch images,
+# scan scripts and eight es-theme-* clones), tarred it into /roms.tar, and
+# staged more themes in /tempthemes for firstboot to unpack onto EASYROMS.
+#
+# spruce is the frontend, it lives on TF2, and emulationstation.service is
+# masked - nothing on this image reads /roms. Dropping the lot also takes a
+# pile of network fetches out of the build, each of which upstream retries
+# forever on failure.
+#
+# See setup_partition-rk3566.sh (no p5) and scripts/expandtoexfat.sh.rk3566
+# (rootfs grow only).
+# --- end strip -------------------------------------------------------------
 
 sync
 sudo umount -l ${mountpoint}
-
-fat32_mountpoint=mnt/roms
-mkdir -p ${fat32_mountpoint}
-sudo mkdir -p Arkbuild/roms
-while read GAME_SYSTEM; do
-  if [[ ! "$GAME_SYSTEM" =~ ^# ]]; then
-    echo -e "Creating ${fat32_mountpoint}/${GAME_SYSTEM}\n"
-    sudo mkdir -p ${fat32_mountpoint}/${GAME_SYSTEM}
-  fi
-done <game_systems.txt
-
-for extra_dir in cdimono1 gc tigerlcd
-do
-  echo -e "Creating ${fat32_mountpoint}/${extra_dir} for rk3566 only\n"
-  sudo mkdir -p ${fat32_mountpoint}/${extra_dir}
-done
-
-# Add latest version of PortMaster install to roms/tools folder
-for (( ; ; ))
-do
- PMver=$(curl --silent -qI https://github.com/PortsMaster/PortMaster-GUI/releases/latest | awk -F '/' '/^location/ {print  substr($NF, 1, length($NF)-1)}')
- wget -t 3 -T 60 --no-check-certificate https://github.com/PortsMaster/PortMaster-GUI/releases/download/${PMver}/Install.PortMaster.sh
- if [ $? == 0 ]; then
-  break
- fi
- sleep 10
-done
-sudo mv -f Install.PortMaster.sh ${fat32_mountpoint}/tools/Install.PortMaster.sh
-chmod 777 ${fat32_mountpoint}/tools/Install.PortMaster.sh
-
-# Add latest version of ThemeMaster to roms/tools folder
-for (( ; ; ))
-do
- wget -t 3 -T 60 --no-check-certificate https://github.com/JohnIrvine1433/ThemeMaster/archive/refs/heads/master.zip
- if [ $? == 0 ]; then
-  break
- fi
- sleep 10
-done
-sudo unzip -X -o master.zip -d ${fat32_mountpoint}/tools/
-sudo rm -rf ${fat32_mountpoint}/tools/ThemeMaster
-sudo mv -f ${fat32_mountpoint}/tools/ThemeMaster-master/ThemeMaster ${fat32_mountpoint}/tools/
-sudo mv -f ${fat32_mountpoint}/tools/ThemeMaster-master/ThemeMaster.sh ${fat32_mountpoint}/tools/
-sudo rm -rf ${fat32_mountpoint}/tools/ThemeMaster-master/
-rm -f master.zip
-
-# Get some sample pico-8 games
-sudo rm -rf /roms/pico-8/carts/*
-sudo wget -t 3 -T 60 --no-check-certificate https://www.lexaloffle.com/bbs/cposts/1/15133.p8.png -O ${fat32_mountpoint}/pico-8/carts/celeste.p8.png
-sudo wget -t 3 -T 60 --no-check-certificate https://www.lexaloffle.com/bbs/cposts/sc/scrap_boy-6.p8.png -O ${fat32_mountpoint}/pico-8/carts/scrap_boy-6.p8.png
-sudo wget -t 3 -T 60 --no-check-certificate https://www.lexaloffle.com/bbs/cposts/di/dinkykong-0.p8.png -O ${fat32_mountpoint}/pico-8/carts/dinkykong-0.p8.png
-sudo wget -t 3 -T 60 --no-check-certificate https://www.lexaloffle.com/bbs/cposts/po/poom_0-9.p8.png -O ${fat32_mountpoint}/pico-8/carts/poom_0-9.p8.png
-sudo wget -t 3 -T 60 --no-check-certificate https://www.lexaloffle.com/bbs/cposts/ch/cherrybomb-0.p8.png -O ${fat32_mountpoint}/pico-8/carts/cherrybomb-0.p8.png
-
-# Copy default game launch images
-sudo cp launchimages/loading.ascii.${UNIT} ${fat32_mountpoint}/launchimages/loading.ascii
-sudo cp launchimages/loading.jpg.${UNIT} ${fat32_mountpoint}/launchimages/loading.jpg
-
-# Copy default shutdown launch image
-sudo cp shutdownimages/bye.gif ${fat32_mountpoint}/shutdownimages/
-
-# Copy various tools to roms folders
-sudo cp -a ecwolf/Scan* ${fat32_mountpoint}/wolf/
-sudo cp -a scummvm/scripts/Scan* ${fat32_mountpoint}/scummvm/
-sudo cp -a hypseus-singe/scripts/Scan* ${fat32_mountpoint}/alg/
-sudo cp -a scummvm/scripts/menu.scummvm ${fat32_mountpoint}/scummvm/
-
-# Clone some themes to the roms/themes folder
-sudo git clone --depth=1 https://github.com/Jetup13/es-theme-nes-box.git ${fat32_mountpoint}/themes/es-theme-nes-box
-sync
-
-# Create roms.tar for use after exfat partition creation
-sudo tar -C mnt/ -cvf Arkbuild/roms.tar roms
-
-# Remove and cleanup fat32 roms mountpoint
-sudo chmod -R 755 ${fat32_mountpoint}
-sync
-
-sudo rm -rf ${fat32_mountpoint}

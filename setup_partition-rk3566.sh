@@ -48,12 +48,17 @@ GUID_BASIC_DATA="EBD0A0A2-B9E5-4433-87C0-68B6B72699C7"
 
 # Partition layout (sector = 512B)
 # name, start_sector, end_sector, guid
+#
+# No ROMS partition. Upstream dArkOS ships a 79MB p5 stub that firstboot then
+# blows up into an EASYROMS exfat volume filling the card. spruce is the
+# frontend, it lives on TF2, and nothing on this image ever reads /roms - so
+# TF1 is boot + rootfs only and firstboot grows the rootfs into the whole card
+# instead. See scripts/expandtoexfat.sh.rk3566.
 declare -a PARTS=(
   "uboot 16384 24575 $GUID_UBOOT"          # 4MB
   "resource 24576 32767 $GUID_RESOURCE"    # 4MB
   "dArkMoss 32768 235519 $GUID_BASIC_DATA" # 104MB
-  "rootfs 237568 15445614 $GUID_BASIC_DATA" # ~7.7GB
-  "4 15445615 15608046 $GUID_BASIC_DATA"   # 79MB
+  "rootfs 237568 15608046 $GUID_BASIC_DATA" # ~7.8GB, runs to the end of the image
 )
 
 # Create partitions with sgdisk
@@ -69,7 +74,6 @@ sleep 2
 # Format partitions where needed
 sudo mkfs.vfat -F 32 -n dArkMoss "${LOOP_DEV}p3"
 sudo mkfs.${ROOT_FILESYSTEM_FORMAT} ${ROOT_FILESYSTEM_FORMAT_PARAMETERS} "${LOOP_DEV}p4"
-sudo mkfs.vfat -n ROMS "${LOOP_DEV}p5"
 
 dd if=/dev/zero of="${FILESYSTEM}" bs=1M count=0 seek="${BUILD_SIZE}" conv=fsync
 sudo mkfs.${ROOT_FILESYSTEM_FORMAT} ${ROOT_FILESYSTEM_FORMAT_PARAMETERS} "${FILESYSTEM}"
