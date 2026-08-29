@@ -202,6 +202,75 @@ function install_package() {
   done
 }
 
+# Install a whole list of packages in ONE apt transaction, per architecture.
+#
+# install_package() runs a separate chroot+apt per package. Under qemu-user
+# emulation that is the single most expensive thing this build does: a measured
+# RGB30 run made 155 apt invocations and 2882 "Reading database" passes, and
+# spent ~96 minutes of a 145-minute build inside them. apt re-reads the whole
+# dpkg database on every invocation, so the cost is per-call, not per-package.
+#
+# Batching collapses that to one or two passes. Falls back to the per-package
+# loop if the batch fails, because upstream's loop is deliberately tolerant of a
+# package name that no longer exists in the current Debian release, and one bad
+# name would otherwise take the whole transaction down with it.
+function install_packages_batch() {
+  local BIT="$1"; shift
+  local pkgs=( "$@" )
+  [ ${#pkgs[@]} -eq 0 ] && return 0
+
+  local CHROOT_DIR NEEDED_ARCH
+  if [ "$BIT" == "32" ]; then
+    NEEDED_ARCH=""
+    CHROOT_DIR="Arkbuild32"
+  elif [ "$BIT" == "armhf" ]; then
+    NEEDED_ARCH=":armhf"
+    CHROOT_DIR="Arkbuild"
+  else
+    NEEDED_ARCH=":arm64"
+    CHROOT_DIR="Arkbuild"
+  fi
+
+  # Same one-shot sources.list fixup and apt update install_package does.
+  if [[ "$updateapt" == "N" ]]; then
+    if test -z "$(cat ${CHROOT_DIR}/etc/apt/sources.list | grep contrib)"; then
+      sudo sed -i '/main/s//main contrib non-free non-free-firmware/' ${CHROOT_DIR}/etc/apt/sources.list
+    fi
+    sudo chroot ${CHROOT_DIR}/ apt -y update
+    updateapt="Y"
+  fi
+
+  # Skip anything already present, so a restored chroot does not redo the work.
+  local wanted=()
+  local p
+  for p in "${pkgs[@]}"; do
+    if ! sudo chroot ${CHROOT_DIR}/ dpkg -s "${p}${NEEDED_ARCH}" &>/dev/null; then
+      wanted+=( "${p}${NEEDED_ARCH}" )
+    fi
+  done
+  [ ${#wanted[@]} -eq 0 ] && { echo "All ${#pkgs[@]} packages already installed."; return 0; }
+
+  echo "Installing ${#wanted[@]} packages in one transaction..."
+  if sudo chroot ${CHROOT_DIR}/ bash -c "DEBIAN_FRONTEND=noninteractive eatmydata apt -y install ${wanted[*]}"; then
+    return 0
+  fi
+
+  echo "Batch install failed - falling back to one package at a time to find the bad name(s)."
+  for p in "${pkgs[@]}"; do
+    install_package "$BIT" "$p"
+  done
+}
+
+# apt-mark the whole list in one call, for the same reason.
+function protect_packages_batch() {
+  local BIT="$1"; shift
+  local pkgs=( "$@" )
+  [ ${#pkgs[@]} -eq 0 ] && return 0
+  local CHROOT_DIR
+  if [ "$BIT" == "32" ]; then CHROOT_DIR="Arkbuild32"; else CHROOT_DIR="Arkbuild"; fi
+  sudo chroot ${CHROOT_DIR}/ apt-mark manual ${pkgs[*]} ||     echo "Could not mark one or more packages as manually installed."
+}
+
 function protect_package() {
   if [ "$1" == "32" ]; then
     CHROOT_DIR="Arkbuild32"

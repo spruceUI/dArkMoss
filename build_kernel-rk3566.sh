@@ -1,13 +1,44 @@
 #!/bin/bash
 
+source ./scripts/ci/build-cache.sh
+
 # Build and install custom kernel from christianhaitian/linux
 KERNEL_SRC=main
-if [ ! -d "$KERNEL_SRC" ]; then
-  git clone --recursive --depth=1 https://github.com/christianhaitian/kernel_5_10_226.git $KERNEL_SRC
+KERNEL_REPO=https://github.com/christianhaitian/kernel_5_10_226.git
+
+# Kernel artifacts are cached on a release, keyed by everything that can change
+# what comes out: the upstream kernel SHA, the defconfig name, the unit, and the
+# boot logos (which are compiled into the kernel, so they are real inputs). A
+# hit skips a ~12 minute compile; a miss builds and publishes as before.
+KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
+    "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" \
+    "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png")"
+KERNEL_CACHE_ASSET="kernel-${UNIT}-${KERNEL_CACHE_KEY}.tar.zst"
+KERNEL_FROM_CACHE=n
+
+# The tarball holds the INSTALLED results, not the object tree: the Image and
+# dtbs, and the module and firmware trees already staged into Arkbuild. Packing
+# the source tree instead would not work - modules_install copies .ko files out
+# of the object tree, and keeping several GB of objects to avoid a 12 minute
+# compile is a bad trade.
+if bc_fetch "$KERNEL_CACHE_ASSET" "kernel-cache.tar.zst"; then
+  if sudo tar --zstd -xf kernel-cache.tar.zst; then
+    KERNEL_FROM_CACHE=y
+    echo "Kernel restored from build cache; skipping the compile and modules_install."
+  else
+    echo "Kernel cache tarball would not extract - building from source."
+  fi
+  rm -f kernel-cache.tar.zst
+fi
+
+if [ "$KERNEL_FROM_CACHE" != "y" ] && [ ! -d "$KERNEL_SRC" ]; then
+  git clone --recursive --depth=1 $KERNEL_REPO $KERNEL_SRC
 fi
 cd $KERNEL_SRC
-# Change the boot logo depending on the device
-if [[ -e "../logos/unrotated/dArkMoss${UNIT}.png" ]]; then
+# Change the boot logo depending on the device. Skipped on a cache hit: the
+# logos are an input to the cache key, so a cached Image already has them, and
+# there is no drivers/video/logo in a restored tree to write into.
+if [ "$KERNEL_FROM_CACHE" != "y" ] && [[ -e "../logos/unrotated/dArkMoss${UNIT}.png" ]]; then
   apt list --installed 2>/dev/null | grep -q "netpbm"
   if [[ $? != "0" ]]; then
     sudo apt -y update
@@ -17,14 +48,32 @@ if [[ -e "../logos/unrotated/dArkMoss${UNIT}.png" ]]; then
   pngtopnm ../logos/unrotated/dArkMosshdmi.png | ppmquant 224 | pnmnoraw > drivers/video/logo/logo_hdmi_clut224.ppm
 fi
 
-make ARCH=arm64 rk3566_optimized_linux_defconfig
-CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 KERNEL_DTS=rk3566 KERNEL_CONFIG=rk3566_optimized_linux_defconfig
-verify_action
+if [ "$KERNEL_FROM_CACHE" != "y" ]; then
+  make ARCH=arm64 rk3566_optimized_linux_defconfig
+  CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 KERNEL_DTS=rk3566 KERNEL_CONFIG=rk3566_optimized_linux_defconfig
+  verify_action
+fi
 cd ..
 
-# Install kernel modules
-sudo make -C $KERNEL_SRC ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../Arkbuild modules_install
-sudo cp -Rv $KERNEL_SRC/lib/firmware/ Arkbuild/usr/lib/
+# Install kernel modules, then pack the installed results for the next build.
+# On a cache hit both trees are already in place from the tarball.
+if [ "$KERNEL_FROM_CACHE" != "y" ]; then
+  sudo make -C $KERNEL_SRC ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../Arkbuild modules_install
+  sudo cp -Rv $KERNEL_SRC/lib/firmware/ Arkbuild/usr/lib/
+
+  echo "Packing the kernel for the build cache..."
+  if sudo tar --zstd -cf kernel-cache.tar.zst \
+      "$KERNEL_SRC/arch/arm64/boot/Image" \
+      "$KERNEL_SRC/arch/arm64/boot/dts/rockchip" \
+      "$KERNEL_SRC/lib/firmware" \
+      Arkbuild/lib/modules \
+      Arkbuild/usr/lib/firmware; then
+    bc_publish "$KERNEL_CACHE_ASSET" kernel-cache.tar.zst
+  else
+    echo "Kernel pack failed - not publishing, build continues."
+  fi
+  rm -f kernel-cache.tar.zst
+fi
 
 mountpoint=mnt/boot
 mkdir -p ${mountpoint}
@@ -134,15 +183,29 @@ if [[ "$UNIT" == "503" ]] || [[ "$UNIT" == *"353"* ]] || [[ "$UNIT" == *"miniloo
   rm -rf rkbin
   #scripts/mkimg --dtb ${UNIT_DTB}.dtb
 else
-  # For some reason, supported PowKiddy rk3566 devices need resource.img generated from the RG503 Kernel source
-  git clone --recursive --depth=1 https://github.com/christianhaitian/rg503Kernel.git
-  cd rg503Kernel
-  make ARCH=arm64 rk3566_optimized_linux_defconfig
-  CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 KERNEL_DTS=rk3566 KERNEL_CONFIG=rk3566_optimized_linux_defconfig
-  cp arch/arm64/boot/dts/rockchip/rk3566.dtb .
-  scripts/mkimg --dtb rk3566.dtb
-  cp resource.img ../.
-  cd ..
+  # For some reason, supported PowKiddy rk3566 devices need resource.img
+  # generated from the RG503 Kernel source.
+  #
+  # That means a SECOND full kernel compile - about ten minutes - to produce one
+  # small image holding the off-charging battery screen. The output depends only
+  # on the rg503Kernel tree, so cache it on the release and the second compile
+  # happens once ever rather than once a build.
+  RESOURCE_CACHE_KEY="$(bc_key "$(bc_remote_sha https://github.com/christianhaitian/rg503Kernel.git)" "rk3566_optimized_linux_defconfig")"
+  RESOURCE_CACHE_ASSET="resource-rk3566-${RESOURCE_CACHE_KEY}.img"
+
+  if ! bc_fetch "$RESOURCE_CACHE_ASSET" "resource.img"; then
+    git clone --recursive --depth=1 https://github.com/christianhaitian/rg503Kernel.git
+    cd rg503Kernel
+    make ARCH=arm64 rk3566_optimized_linux_defconfig
+    CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 KERNEL_DTS=rk3566 KERNEL_CONFIG=rk3566_optimized_linux_defconfig
+    cp arch/arm64/boot/dts/rockchip/rk3566.dtb .
+    scripts/mkimg --dtb rk3566.dtb
+    cp resource.img ../.
+    cd ..
+    bc_publish "$RESOURCE_CACHE_ASSET" resource.img
+    # The tree is only ever needed for that one file.
+    rm -rf rg503Kernel
+  fi
 fi
 git clone --depth=1 https://github.com/christianhaitian/rk356x-uboot.git
 git clone https://github.com/christianhaitian/rkbin.git

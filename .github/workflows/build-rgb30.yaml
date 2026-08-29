@@ -26,6 +26,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    # Needed to publish the image release, and by scripts/ci/build-cache.sh to
+    # read and write the "build-cache" release's assets. Stated explicitly
+    # rather than inherited from the repo default, so tightening that default
+    # later does not quietly turn the cache into a permanent miss.
+    permissions:
+      contents: write
     # GitHub's own hard cap for a hosted-runner job is 6h; do not impose an
     # artificial cap below it. A cold build (full qemu debootstrap + kernel +
     # build_deps) runs ~3-3.5h, which a 180 cap killed at exactly 3h.
@@ -83,7 +89,8 @@ jobs:
             bc btrfs-progs build-essential bison flex ccache curl debconf-utils \
             debootstrap device-tree-compiler dosfstools e2fsprogs eatmydata gcc \
             gdisk jq lib32stdc++6 libc6-i386 libncurses5-dev libssl-dev lz4 lzop \
-            p7zip-full parted python-is-python3 qemu-user-static zlib1g:i386 xfsprogs
+            p7zip-full parted python-is-python3 qemu-user-static zlib1g:i386 xfsprogs \
+            zstd
 
       - name: Provision the aarch64 toolchain
         run: |
@@ -108,8 +115,15 @@ jobs:
           "/opt/toolchains/$TCNAME/bin/aarch64-linux-gnu-ld" --version | head -1
 
       - name: Build RGB30
+        env:
+          # scripts/ci/build-cache.sh fetches and publishes prebuilt
+          # intermediates (kernel, resource.img, prepared chroot) as assets on
+          # the "build-cache" release. Without a token it degrades to building
+          # everything from scratch, exactly as before.
+          GH_TOKEN: ${{ github.token }}
         run: |
           chmod +x ./*.sh
+          chmod +x ./scripts/ci/*.sh
           # Build through `make`, not ./build_rgb30.sh directly: the Makefile is
           # what sets and exports DEBIAN_CODE_NAME (the debootstrap suite) and
           # the other build knobs. Bypassing it leaves DEBIAN_CODE_NAME empty and
