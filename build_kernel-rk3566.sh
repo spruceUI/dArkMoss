@@ -10,9 +10,16 @@ KERNEL_REPO=https://github.com/christianhaitian/kernel_5_10_226.git
 # what comes out: the upstream kernel SHA, the defconfig name, the unit, and the
 # boot logos (which are compiled into the kernel, so they are real inputs). A
 # hit skips a ~12 minute compile; a miss builds and publishes as before.
+# The trailing token is the cache FORMAT version, not a content input. The key
+# otherwise describes only what goes into the kernel, not what we choose to pack
+# out of it - so when the file list here changes, an old tarball would still key
+# as a hit and restore an incomplete tree. That is exactly how a pack missing
+# .config would have survived its own fix. Bump it whenever the tar list below
+# changes.
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
     "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" \
-    "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png")"
+    "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png" \
+    "fmt2")"
 KERNEL_CACHE_ASSET="kernel-${UNIT}-${KERNEL_CACHE_KEY}.tar.zst"
 KERNEL_FROM_CACHE=n
 
@@ -24,6 +31,13 @@ KERNEL_FROM_CACHE=n
 if bc_fetch "$KERNEL_CACHE_ASSET" "kernel-cache.tar.zst"; then
   if sudo tar --zstd -xf kernel-cache.tar.zst; then
     KERNEL_FROM_CACHE=y
+    # The tarball has to be unpacked as root - Arkbuild's module tree is
+    # root-owned and must stay that way - but $KERNEL_SRC is a workspace
+    # directory the build writes into as the normal user later (it clones
+    # rg503Kernel and rk356x-uboot inside it). Leaving it root-owned makes those
+    # clones fail with "could not create work tree dir: Permission denied", and
+    # a failed clone here poisons everything downstream. Hand it back.
+    sudo chown -R "$(id -u):$(id -g)" "$KERNEL_SRC" 2>/dev/null
     echo "Kernel restored from build cache; skipping the compile and modules_install."
   else
     echo "Kernel cache tarball would not extract - building from source."
@@ -66,6 +80,7 @@ if [ "$KERNEL_FROM_CACHE" != "y" ]; then
       "$KERNEL_SRC/arch/arm64/boot/Image" \
       "$KERNEL_SRC/arch/arm64/boot/dts/rockchip" \
       "$KERNEL_SRC/lib/firmware" \
+      "$KERNEL_SRC/.config" \
       Arkbuild/lib/modules \
       Arkbuild/usr/lib/firmware; then
     bc_publish "$KERNEL_CACHE_ASSET" kernel-cache.tar.zst
@@ -194,15 +209,27 @@ else
   RESOURCE_CACHE_ASSET="resource-rk3566-${RESOURCE_CACHE_KEY}.img"
 
   if ! bc_fetch "$RESOURCE_CACHE_ASSET" "resource.img"; then
-    git clone --recursive --depth=1 https://github.com/christianhaitian/rg503Kernel.git
-    cd rg503Kernel
-    make ARCH=arm64 rk3566_optimized_linux_defconfig
-    CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 KERNEL_DTS=rk3566 KERNEL_CONFIG=rk3566_optimized_linux_defconfig
-    cp arch/arm64/boot/dts/rockchip/rk3566.dtb .
-    scripts/mkimg --dtb rk3566.dtb
-    cp resource.img ../.
-    cd ..
-    bc_publish "$RESOURCE_CACHE_ASSET" resource.img
+    # Built in a subshell so a failure in here cannot move the caller's working
+    # directory. The original "cd rg503Kernel ... cd .." pairing looks safe
+    # until the clone fails: the cd in fails, the cd out still runs, and the
+    # whole rest of the script executes one directory too high - which is
+    # exactly how a permissions error on the clone ended up producing an image
+    # with no resource.img flashed into it.
+    (
+      set -e
+      git clone --recursive --depth=1 https://github.com/christianhaitian/rg503Kernel.git
+      cd rg503Kernel
+      make ARCH=arm64 rk3566_optimized_linux_defconfig
+      CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 KERNEL_DTS=rk3566 KERNEL_CONFIG=rk3566_optimized_linux_defconfig
+      cp arch/arm64/boot/dts/rockchip/rk3566.dtb .
+      scripts/mkimg --dtb rk3566.dtb
+      cp resource.img ../.
+    )
+    if [ -s resource.img ]; then
+      bc_publish "$RESOURCE_CACHE_ASSET" resource.img
+    else
+      echo "ERROR: resource.img was not produced - the image will not boot."
+    fi
     # The tree is only ever needed for that one file.
     rm -rf rg503Kernel
   fi
