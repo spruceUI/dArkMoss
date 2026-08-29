@@ -41,7 +41,15 @@ source ./build_deps.sh
 # kernel + assembly. Left commented rather than deleted so the exact upstream
 # set is visible and any single one is trivial to re-enable if assembly turns
 # out to need it.
-#source ./build_sdl2.sh
+# --- port runtime: keep these, PortMaster needs them -----------------------
+# dArkOS builds its own SDL2 from christianhaitian/rk3566_core_builds and
+# installs it AS the system libSDL2-2.0.so.0. That build is made for this Mali
+# blob, and it is what every dArkOS port runs against. Stock Debian's SDL2 is
+# not a substitute: it links libwayland-egl and asks for a desktop GL config the
+# blob does not advertise - the same wall PyUI had to code around with an
+# explicit ES profile. Ports link SDL2 themselves and cannot be patched one by
+# one, so the fix has to be the library.
+source ./build_sdl2.sh
 #source ./build_ppssppsa.sh
 #source ./build_ppsspp-2021sa.sh
 #source ./build_duckstationsa.sh
@@ -62,12 +70,17 @@ source ./build_deps.sh
 #source ./build_mvem.sh
 #source ./build_bigpemu.sh
 #source ./build_ogage.sh
-#source ./build_ogacontrols.sh
+# oga_controls is what ArkOS ports call to read the pad.
+source ./build_ogacontrols.sh
+# --- end port runtime ------------------------------------------------------
 #source ./build_351files.sh
 #source ./build_filemanager.sh
 #source ./build_filebrowser.sh
-#source ./build_gptokeyb.sh
-#source ./build_drmtool.sh
+# gptokeyb maps the pad to keys for ports that want a keyboard; drmtool is
+# called by ports that take the display directly. Both are standard ArkOS port
+# furniture and cheap to build.
+source ./build_gptokeyb.sh
+source ./build_drmtool.sh
 #source ./build_image-viewer.sh
 #source ./build_emulationstation-rk3566.sh
 #source ./build_linapple.sh

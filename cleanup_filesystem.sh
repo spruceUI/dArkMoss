@@ -132,7 +132,7 @@ fi
 
 if [[ "${BUILD_ARMHF}" == "y" ]]; then
   cd Arkbuild/usr/lib/arm-linux-gnueabihf
-  for LIB in libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so libOpenCL.so libOpenCL.so libwayland-egl.so libwayland-egl.so.1 libwayland-egl.so.1.0.0
+  for LIB in libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so libOpenCL.so libOpenCL.so
   do
     sudo rm -fv ${LIB}
     sudo ln -sfv libMali.so ${LIB}
@@ -156,7 +156,14 @@ if [[ "${BUILD_ARMHF}" == "y" ]]; then
   rm -f libasound2_1.2.8-1+b1_armhf.deb
 fi
 
-MALI_LIBS="libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so libOpenCL.so libOpenCL.so.1 libwayland-egl.so libwayland-egl.so.1 libwayland-egl.so.1.0.0"
+# libwayland-egl.so{,.1,.1.0.0} are deliberately NOT in this list. Upstream
+# symlinks them to libMali.so like the rest, but the blob does not export the
+# wayland-egl API - libSDL2 links it, so every binary using the system SDL2 dies
+# at startup with "undefined symbol: wl_egl_window_destroy". PyUI is the only
+# thing that survived it, because it bundles its own SDL2. Debian's real
+# libwayland-egl.so.1.23.1 was on disk the whole time; only the soname symlink
+# was being hijacked. Verified on hardware: restore it and system SDL2 loads.
+MALI_LIBS="libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so libOpenCL.so libOpenCL.so.1"
 
 # Divert the dpkg-owned names before overwriting them with Mali symlinks.
 #
