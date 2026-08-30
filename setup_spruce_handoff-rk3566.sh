@@ -126,3 +126,16 @@ sudo chroot Arkbuild/ bash -c "systemctl enable darkmoss-debug.service"
 if ! grep -q '^OS_NAME=' Arkbuild/etc/os-release 2>/dev/null; then
   echo 'OS_NAME="DARKMOSS"' | sudo tee -a Arkbuild/etc/os-release >/dev/null
 fi
+
+# Declare the hardware for PortMaster. harbourmaster reads HW_DEVICE out of
+# os-release and runs it through its pattern_to_device table, where
+# "powkiddy rgb30" maps to its rgb30 profile - 720x720, rk3566, 1GB, two
+# sticks. Without it the device resolves to "unknown" and harbourmaster falls
+# back to a 640x480 4:3 default on a 720x720 1:1 panel, which also drops the
+# "rgb30" capability that port compatibility keys on. The match is exact, so
+# the value has to be the plain model name, not the DT model string
+# ("Powkiddy RGB30 aka wonderfully weird unit"). Verified live on hardware:
+# with this set, device_info() returns rgb30 / (720,720) / rk3566.
+if ! grep -q '^HW_DEVICE=' Arkbuild/etc/os-release 2>/dev/null; then
+  echo 'HW_DEVICE="Powkiddy RGB30"' | sudo tee -a Arkbuild/etc/os-release >/dev/null
+fi
