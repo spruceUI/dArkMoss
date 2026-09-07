@@ -119,23 +119,34 @@ sudo chroot Arkbuild/ bash -c "systemctl enable darkmoss-debug.service"
 # finishing_touches-rk3566.sh, which is the last place p3 is still mounted.
 # --- end logging -----------------------------------------------------------
 
-# Stamp an identifier spruce's platform detection keys off. The RGB30 shares its
-# cpuinfo signature (0xd05) with the Miyoo Flip, so spruce reads os-release to
-# tell them apart. spruce's helperFunctions.sh must match DARKMOSS in its 0xd05
-# case.
+# Stamp an identifier spruce's platform detection keys off. Every rk3566 unit
+# here shares its cpuinfo signature (0xd05) with the Miyoo Flip, so spruce reads
+# os-release to tell them apart. spruce's helperFunctions.sh must match DARKMOSS
+# in its 0xd05 case; HW_DEVICE below says which dArkMoss unit it is.
 if ! grep -q '^OS_NAME=' Arkbuild/etc/os-release 2>/dev/null; then
   echo 'OS_NAME="DARKMOSS"' | sudo tee -a Arkbuild/etc/os-release >/dev/null
 fi
 
 # Declare the hardware for PortMaster. harbourmaster reads HW_DEVICE out of
-# os-release and runs it through its pattern_to_device table, where
-# "powkiddy rgb30" maps to its rgb30 profile - 720x720, rk3566, 1GB, two
-# sticks. Without it the device resolves to "unknown" and harbourmaster falls
-# back to a 640x480 4:3 default on a 720x720 1:1 panel, which also drops the
-# "rgb30" capability that port compatibility keys on. The match is exact, so
-# the value has to be the plain model name, not the DT model string
-# ("Powkiddy RGB30 aka wonderfully weird unit"). Verified live on hardware:
-# with this set, device_info() returns rgb30 / (720,720) / rk3566.
-if ! grep -q '^HW_DEVICE=' Arkbuild/etc/os-release 2>/dev/null; then
-  echo 'HW_DEVICE="Powkiddy RGB30"' | sudo tee -a Arkbuild/etc/os-release >/dev/null
+# os-release and runs it through its pattern_to_device table. The match is
+# exact, so the value has to be the plain model name, not the DT model string
+# ("Powkiddy RGB30 aka wonderfully weird unit").
+#
+# rgb30: "powkiddy rgb30" maps to its rgb30 profile - 720x720, rk3566, 1GB,
+# two sticks. Without it the device resolves to "unknown" and harbourmaster
+# falls back to a 640x480 4:3 default on a 720x720 1:1 panel, which also drops
+# the "rgb30" capability that port compatibility keys on. Verified live on
+# hardware: with this set, device_info() returns rgb30 / (720,720) / rk3566.
+#
+# miniloong: harbourmaster has no Miniloong entry yet (checked 2026-09-07), so
+# any value resolves to "unknown" today. The name is stamped anyway, in dArkOS's
+# own wording, so that a future PortMaster profile matches without an image
+# rebuild, and so spruce can read which rk3566 unit it is on.
+case "$UNIT" in
+  rgb30)     HW_DEVICE_NAME="Powkiddy RGB30" ;;
+  miniloong) HW_DEVICE_NAME="Miniloong Pocket 1" ;;
+  *)         HW_DEVICE_NAME="" ;;
+esac
+if [ -n "$HW_DEVICE_NAME" ] && ! grep -q '^HW_DEVICE=' Arkbuild/etc/os-release 2>/dev/null; then
+  echo "HW_DEVICE=\"$HW_DEVICE_NAME\"" | sudo tee -a Arkbuild/etc/os-release >/dev/null
 fi

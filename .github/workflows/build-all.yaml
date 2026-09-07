@@ -1,0 +1,61 @@
+# Build every dArkMoss unit and publish them to one release.
+#
+# Each unit is a leg of the matrix, running build-image.yaml in parallel on its
+# own runner. The legs build artifacts only; publishing is a separate job so the
+# release is written once, with every image that built, instead of two jobs
+# racing to create the same tag. A unit that fails does not hold the others
+# back - whatever produced an image is released.
+
+name: build-all
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (blank = no release, artifacts only)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        unit: [rgb30, miniloong]
+    uses: ./.github/workflows/build-image.yaml
+    with:
+      unit: ${{ matrix.unit }}
+
+  publish:
+    needs: build
+    # Run when the matrix finished, however it finished - only a cancel skips
+    # this. A failed leg simply has no artifact to download.
+    if: ${{ !cancelled() && inputs.release_tag != '' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Collect the images
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dArkMoss-*
+          merge-multiple: true
+
+      - name: Show what will be released
+        run: |
+          shopt -s nullglob
+          imgs=( *.img.7z* )
+          if [ ${#imgs[@]} -eq 0 ]; then
+            echo "::error::no unit produced an image, nothing to release"
+            exit 1
+          fi
+          ls -lh *.img.7z*
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          files: "*.img.7z*"

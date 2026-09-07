@@ -1,7 +1,7 @@
-# Build the dArkMoss RGB30 (Powkiddy RGB30, Rockchip RK3566) image. All of the work is in build-image.yaml;
+# Build the dArkMoss Miniloong (Miniloong Pocket 1, Rockchip RK3566) image. All of the work is in build-image.yaml;
 # this only names the unit. See build-all.yaml to build every unit at once.
 
-name: build-rgb30
+name: build-miniloong
 
 on:
   workflow_dispatch:
@@ -17,8 +17,8 @@ permissions:
   contents: write
 
 jobs:
-  rgb30:
+  miniloong:
     uses: ./.github/workflows/build-image.yaml
     with:
-      unit: rgb30
+      unit: miniloong
       release_tag: ${{ inputs.release_tag }}

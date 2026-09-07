@@ -49,3 +49,36 @@ ImCoKeMaN for testing and feedback \
 
 
 test webhook.... again......again!
+
+## dArkMoss
+
+dArkMoss is spruceUI's fork of dArkOS: a Debian base OS on TF1 that hands off to
+[spruce](https://github.com/spruceUI/spruceOS) on TF2. The emulator and
+EmulationStation builds are stripped from the unit build scripts because spruce
+provides all of that from its own card; what is left is debootstrap, the kernel
+and image assembly.
+
+Units:
+
+| unit | device | Makefile target | script |
+|---|---|---|---|
+| rgb30 | Powkiddy RGB30 | `make rgb30` | `build_rgb30.sh` |
+| miniloong | Miniloong Pocket 1 | `make miniloong` | `build_miniloong.sh` |
+
+Images are built on GitHub Actions, not locally. Under Actions:
+
+- **build-rgb30** / **build-miniloong** build one unit.
+- **build-all** builds every unit in parallel and publishes them to one release.
+
+Each takes an optional release tag. Left blank, the image is only kept as a
+workflow artifact. Images ship as `dArkMoss_<UNIT>_<suite>_<date>.img.7z.001`
+and `.002` because a single volume is over GitHub's asset limit; the parts are
+a plain byte split, so `cat` them (or let 7z read `.001`) to extract.
+
+Adding a unit that dArkOS already supports: copy `build_rgb30.sh` to
+`build_<unit>.sh` and change `UNIT`, add `logos/unrotated/dArkMoss<unit>.png`
+(the kernel boot logo), give it a name in the `HW_DEVICE` case in
+`setup_spruce_handoff-rk3566.sh`, add a dispatcher workflow next to
+`build-rgb30.yaml` and put the unit in `build-all.yaml`'s matrix. Everything
+else in the pipeline already keys on `UNIT`.
+

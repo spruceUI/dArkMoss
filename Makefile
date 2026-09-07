@@ -23,7 +23,7 @@ ifeq ($(DEBIAN_CODE_NAME),)
 endif
 
 all:
-	@echo "Please specify a valid build target: make rgb10 or make rg353m"
+	@echo "Please specify a valid build target. dArkMoss targets: make rgb30, make miniloong"
 
 a10mini:
 	$(info dArkOS will be built using the $(DEBIAN_CODE_NAME) release of Debian.)
