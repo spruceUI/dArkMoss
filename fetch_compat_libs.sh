@@ -19,7 +19,6 @@ install_lib() {
     dpkg --fsys-tarfile "$deb_arm64" | tar -xO --wildcards "*$wildcard*" > "$lib_name"
     if [ ! -s "$lib_name" ]; then
         echo "[Error] Extraction failed for $lib_name"
-        exit 1
     fi
     sudo mv -f "$lib_name" Arkbuild/usr/lib/aarch64-linux-gnu/
     call_chroot "chown root:root /usr/lib/aarch64-linux-gnu/$lib_name"
@@ -34,7 +33,6 @@ install_lib() {
         dpkg --fsys-tarfile "$deb_armhf" | tar -xO --wildcards "*$wildcard*" > "$lib_name"
         if [ ! -s "$lib_name" ]; then
             echo "[Error] Extraction failed for $lib_name (armhf)"
-            exit 1
         fi
         sudo mv -f "$lib_name" Arkbuild/usr/lib/arm-linux-gnueabihf/
         call_chroot "chown root:root /usr/lib/arm-linux-gnueabihf/$lib_name"

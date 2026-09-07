@@ -187,7 +187,7 @@ if [[ "$UNIT" == "503" ]] || [[ "$UNIT" == *"353"* ]] || [[ "$UNIT" == *"miniloo
   elif [[ "$UNIT" == *"miniloong"* ]]; then
     cp ../../../misc/rk3566/device_off_charging_bmps/miniloong/*.bmp .
     #cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb .
-    cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb rk-kernel.dtb
+    cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}-uboot.dtb rk-kernel.dtb
   else
     cp ../../../misc/rk3566/device_off_charging_bmps/rg353/* .
   fi
