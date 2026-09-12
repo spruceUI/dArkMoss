@@ -72,7 +72,7 @@ install_lib \
 
 # libvpx6 (1.9.0, Debian 11 security)
 install_lib \
-    "http://security.debian.org/debian-security/pool/updates/main/libv/libvpx/libvpx6_1.9.0-1+deb11u5_arm64.deb" \
+    "https://mirror1.isatisidc.ir/debian-security/pool/main/libv/libvpx/libvpx6_1.9.0-1+deb11u5_arm64.deb" \
     "libvpx.so.6" "libvpx.so.6"
 
 # libwebp6 (0.6.1, Debian 11 security)
