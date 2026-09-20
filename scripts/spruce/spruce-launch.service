@@ -35,15 +35,20 @@ ExecStart=/bin/sh -lc 'exec /mnt/SDCARD/spruce/scripts/runtime.sh'
 Restart=on-failure
 RestartSec=3
 StandardInput=tty
-# NOT tty. With TTYPath=/dev/tty1 below, every echo and log_message from
-# runtime.sh and everything it calls was printed straight onto the panel, so
-# each game launch and exit flashed a wall of spruce narrating its own scripts.
-# The journal keeps all of it and costs nothing now that dArkMoss ships a
-# persistent one (64M cap, see setup_spruce_handoff-rk3566.sh) - journalctl has
-# it, and darkmoss-debug.sh exports it to /boot/logs for reading off the card.
+# journal+console, gated by the /boot/darkmoss-debug flag - not plain journal,
+# and not plain tty. Output always lands in the journal (persistent, 64M cap,
+# see setup_spruce_handoff-rk3566.sh; darkmoss-debug.sh exports it to /boot/logs
+# off the card). It ALSO goes to /dev/console, which is tty1 here (console=tty1
+# on the kernel cmdline) - the framebuffer VT. Whether that reaches the panel is
+# decided by console-blank.sh above: with /boot/darkmoss-debug present it leaves
+# fbcon bound, so spruce narrates itself on screen at boot and during every
+# frontend/game handoff (the gaps where nothing holds DRM); without the flag it
+# unbinds fbcon and the console text never paints, so ordinary users see the
+# clean panel they had before. This is the on-screen narration we removed, put
+# back behind the debug flag instead of on for everyone.
 # stdin stays on the tty: the frontend still needs the VT for DRM and input.
-StandardOutput=journal
-StandardError=journal
+StandardOutput=journal+console
+StandardError=journal+console
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
