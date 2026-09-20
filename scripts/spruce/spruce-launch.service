@@ -31,24 +31,29 @@ ExecStartPre=-/usr/local/sbin/console-blank.sh
 # runtime.sh is spruce's own entry point; it detects the platform (RGB30 here)
 # and runs its main loop. Runs as root - spruce does its own mounts and touches
 # hardware directly.
-ExecStart=/bin/sh -lc 'exec /mnt/SDCARD/spruce/scripts/runtime.sh'
+#
+# With /boot/darkmoss-debug set, redirect runtime.sh to /dev/tty1 so spruce
+# narrates on the panel. NOT via /dev/console: this device's u-boot boots with
+# console=ttyUSB0 (a serial port) and ignores the card's console=tty1, so
+# console-targeted output goes to the UART, not the screen. /dev/tty1 is the
+# framebuffer VT regardless (tty0/active is tty1; console-blank.sh above leaves
+# fbcon bound when the flag is set, so the text paints - at boot and in the
+# gaps between the frontend and a game, where nothing holds DRM). Without the
+# flag, runtime.sh runs normally and its output goes to the journal below. exec
+# keeps runtime.sh as the unit's MainPID in both branches, which the
+# KillMode=process shutdown path above depends on.
+ExecStart=/bin/sh -lc 'if [ -e /boot/darkmoss-debug ]; then exec /mnt/SDCARD/spruce/scripts/runtime.sh >/dev/tty1 2>&1; else exec /mnt/SDCARD/spruce/scripts/runtime.sh; fi'
 Restart=on-failure
 RestartSec=3
 StandardInput=tty
-# journal+console, gated by the /boot/darkmoss-debug flag - not plain journal,
-# and not plain tty. Output always lands in the journal (persistent, 64M cap,
-# see setup_spruce_handoff-rk3566.sh; darkmoss-debug.sh exports it to /boot/logs
-# off the card). It ALSO goes to /dev/console, which is tty1 here (console=tty1
-# on the kernel cmdline) - the framebuffer VT. Whether that reaches the panel is
-# decided by console-blank.sh above: with /boot/darkmoss-debug present it leaves
-# fbcon bound, so spruce narrates itself on screen at boot and during every
-# frontend/game handoff (the gaps where nothing holds DRM); without the flag it
-# unbinds fbcon and the console text never paints, so ordinary users see the
-# clean panel they had before. This is the on-screen narration we removed, put
-# back behind the debug flag instead of on for everyone.
 # stdin stays on the tty: the frontend still needs the VT for DRM and input.
-StandardOutput=journal+console
-StandardError=journal+console
+# Output goes to the journal - persistent (64M cap, see
+# setup_spruce_handoff-rk3566.sh), and exported to /boot/logs by
+# darkmoss-debug.sh for reading off the card. The debug flag puts spruce on the
+# panel through the ExecStart redirect above, not here: StandardOutput=console
+# would target this device's serial console (ttyUSB0), not the screen.
+StandardOutput=journal
+StandardError=journal
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
