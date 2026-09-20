@@ -45,7 +45,13 @@ sudo chroot Arkbuild/ bash -c "systemctl mask emulationstation.service 2>/dev/nu
 #   a successful login landed on "Could not chdir to home directory".
 echo -e "Creating the spruce SSH account...\n\n"
 
-sudo chroot Arkbuild/ bash -c '
+# bash -s reading a quoted heredoc, NOT bash -c '...'. A single-quoted -c string
+# cannot contain an apostrophe: the "systemd's" in the comment below closed the
+# quote early, the parser desynced, and the whole logging block further down was
+# swallowed as quoted text and never ran - so darkmoss-debug shipped absent on
+# RGB30 and Miniloong for weeks, silently, because this build has no set -e. A
+# quoted heredoc passes the body to bash verbatim, apostrophes and all.
+sudo chroot Arkbuild/ bash -s <<'SPRUCE_SSH'
     set -e
 
     if ! grep -q "^spruce:" /etc/passwd; then
@@ -80,7 +86,7 @@ EOF
     # until spruce turns it on from Network Settings, as dArkOS shipped it.
     systemctl disable ssh.service 2>/dev/null || true
     systemctl disable ssh.socket 2>/dev/null || true
-'
+SPRUCE_SSH
 
 # --- logging ---------------------------------------------------------------
 # Two layers, because they answer different questions.
