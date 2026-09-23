@@ -42,37 +42,37 @@ install_lib() {
 
 # libjpeg8 (Debian snapshot, 2014) - PortMaster compatibility
 install_lib \
-    "https://snapshot.debian.org/archive/debian/20141009T042436Z/pool/main/libj/libjpeg8/libjpeg8_8d1-2_arm64.deb" \
+    "https://snapshot.debian.org/archive/debian-ports/20141009T073751Z/pool-arm64/main/libj/libjpeg8/libjpeg8_8d1-2_arm64.deb" \
     "libjpeg.so.8" "libjpeg.so.8"
 
 # libavcodec58 (FFmpeg 4.3.9, Debian 11 security)
 install_lib \
-    "http://security.debian.org/debian-security/pool/updates/main/f/ffmpeg/libavcodec58_4.3.9-0+deb11u2_arm64.deb" \
+    "https://snapshot.debian.org/archive/debian-security/20260116T220506Z/pool/updates/main/f/ffmpeg/libavcodec58_4.3.9-0+deb11u2_arm64.deb" \
     "libavcodec.so.58" "libavcodec.so.58"
 
 # libavutil56 (FFmpeg 4.3.9, Debian 11 security)
 install_lib \
-    "http://security.debian.org/debian-security/pool/updates/main/f/ffmpeg/libavutil56_4.3.9-0+deb11u2_arm64.deb" \
+    "https://snapshot.debian.org/archive/debian-security/20260116T220506Z/pool/updates/main/f/ffmpeg/libavutil56_4.3.9-0+deb11u2_arm64.deb" \
     "libavutil.so.56" "libavutil.so.56"
 
 # libswresample3 (FFmpeg 4.3.9, Debian 11 security)
 install_lib \
-    "http://security.debian.org/debian-security/pool/updates/main/f/ffmpeg/libswresample3_4.3.9-0+deb11u2_arm64.deb" \
+    "https://snapshot.debian.org/archive/debian-security/20260116T220506Z/pool/updates/main/f/ffmpeg/libswresample3_4.3.9-0+deb11u2_arm64.deb" \
     "libswresample.so.3" "libswresample.so.3"
 
 # libavformat58 (FFmpeg 4.3.9, Debian 11 security)
 install_lib \
-    "http://security.debian.org/debian-security/pool/updates/main/f/ffmpeg/libavformat58_4.3.9-0+deb11u2_arm64.deb" \
+    "https://snapshot.debian.org/archive/debian-security/20260116T220506Z/pool/updates/main/f/ffmpeg/libavformat58_4.3.9-0+deb11u2_arm64.deb" \
     "libavformat.so.58" "libavformat.so.58"
 
 # libswscale5 (FFmpeg 4.3.9, Debian 11 security)
 install_lib \
-    "http://security.debian.org/debian-security/pool/updates/main/f/ffmpeg/libswscale5_4.3.9-0+deb11u2_arm64.deb" \
+    "https://snapshot.debian.org/archive/debian-security/20260116T220506Z/pool/updates/main/f/ffmpeg/libswscale5_4.3.9-0+deb11u2_arm64.deb" \
     "libswscale.so.5" "libswscale.so.5"
 
 # libvpx6 (1.9.0, Debian 11 security)
 install_lib \
-    "https://mirror1.isatisidc.ir/debian-security/pool/main/libv/libvpx/libvpx6_1.9.0-1+deb11u5_arm64.deb" \
+    "https://snapshot.debian.org/archive/debian-security/20260222T183359Z/pool/updates/main/libv/libvpx/libvpx6_1.9.0-1+deb11u5_arm64.deb" \
     "libvpx.so.6" "libvpx.so.6"
 
 # libwebp6 (0.6.1, Debian 11 security)
@@ -82,7 +82,7 @@ install_lib \
 
 # libaom0 (1.0.0, Debian 11 security)
 install_lib \
-    "http://security.debian.org/debian-security/pool/updates/main/a/aom/libaom0_1.0.0.errata1-3+deb11u2_arm64.deb" \
+    "https://snapshot.debian.org/archive/debian-security/20240907T184326Z/pool/updates/main/a/aom/libaom0_1.0.0.errata1-3+deb11u2_arm64.deb" \
     "libaom.so.0" "libaom.so.0"
 
 # libdav1d4 (0.7.1, Debian 11)
