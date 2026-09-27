@@ -1,0 +1,31 @@
+name: Sync master with upstream
+
+# master is a 1:1 mirror of christianhaitian/dArkOS for branching upstream PRs
+# from. This only ever fast-forwards it; a push that is not a fast-forward
+# fails, which means upstream rewrote history and someone should look.
+
+on:
+  schedule:
+    - cron: '23 5 * * 1'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Fast-forward master to upstream
+        run: |
+          set -e
+          git remote add upstream https://github.com/christianhaitian/dArkOS.git
+          git fetch upstream master
+          echo "master:   $(git rev-parse --short origin/master)"
+          echo "upstream: $(git rev-parse --short upstream/master)"
+          git push origin upstream/master:master
