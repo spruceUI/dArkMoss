@@ -28,6 +28,9 @@ jobs:
     uses: ./.github/workflows/build-image.yaml
     with:
       unit: ${{ matrix.unit }}
+      # version, not release_tag: the legs stamp it but must not publish, or
+      # they race each other and the publish job for the same tag.
+      version: ${{ inputs.release_tag }}
 
   publish:
     needs: build

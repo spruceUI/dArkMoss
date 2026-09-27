@@ -31,6 +31,11 @@ on:
         required: false
         type: string
         default: ""
+      version:
+        description: "Version to stamp without publishing; build-all passes its tag here and publishes once itself"
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
@@ -133,8 +138,9 @@ jobs:
           # the "build-cache" release. Without a token it degrades to building
           # everything from scratch, exactly as before.
           GH_TOKEN: ${{ github.token }}
-          # Stamped into os-release as OS_VERSION; empty falls back to the build date.
-          DARKMOSS_VERSION: ${{ inputs.release_tag }}
+          # Stamped into os-release as OS_VERSION and into the payload name;
+          # empty falls back to the build date.
+          DARKMOSS_VERSION: ${{ inputs.version || inputs.release_tag }}
         run: |
           chmod +x ./*.sh
           chmod +x ./scripts/ci/*.sh

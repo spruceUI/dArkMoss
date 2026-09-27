@@ -47,6 +47,21 @@ cat > "$WORK/exclude" <<'EOF'
 /__pycache__(/|$)
 ^/home/ark/(\.bash_history|\.cache|\.Xauthority|Arkbuild_ccache)(/|$)
 ^/(meson|debootstrap)(/|$)
+^/etc/security/opasswd$
+^/etc/\.java(/|$)
+^/etc/xml/.*\.old$
+^/usr/lib/udev/hwdb\.bin$
+^/usr/lib/ccache(/|$)
+^/usr/(local/)?include(/|$)
+^/usr/lib/aarch64-linux-gnu/include(/|$)
+^/usr/local/(man|src|games|libexec|etc)(/|$)
+EOF
+
+# Never delete firmware. The CI chroot cache leaves the firmware packages' files
+# out of the tarball, so a cache-built rootfs reports them missing although a
+# device flashed from a cold build has them and a USB dongle may need them.
+cat > "$WORK/never-remove" <<'EOF'
+^/usr/lib/firmware(/|$)
 EOF
 
 # dpkg records merged-/usr paths; fold the few legacy /lib, /bin, /sbin entries
@@ -70,9 +85,17 @@ comm -23 "$WORK/all" "$WORK/owned" > "$WORK/unowned"
 
 # Owned files the build changed or removed. md5sums files cover regular files;
 # conffiles carry their reference md5 in the status file instead.
+# A dangling symlink also fails to open; it is something the build put there,
+# so it ships rather than being deleted.
 sudo bash -c 'cd Arkbuild && md5sum --quiet -c var/lib/dpkg/info/*.md5sums 2>/dev/null' \
   | sed -n 's/^\(.*\): FAILED open or read$/MISSING \/\1/p; t; s/^\(.*\): FAILED$/CHANGED \/\1/p' \
-  > "$WORK/verify"
+  | while read -r verdict path; do
+      if [ "$verdict" = "MISSING" ] && [ -L "Arkbuild$path" ]; then
+        echo "CHANGED $path"
+      else
+        echo "$verdict $path"
+      fi
+    done > "$WORK/verify"
 sudo awk '
   /^Conffiles:/ { inblock = 1; next }
   /^ / && inblock { if ($2 != "newconffile") print $1, $2; next }
@@ -86,7 +109,7 @@ sudo awk '
 done >> "$WORK/verify"
 
 sed -n 's/^CHANGED //p' "$WORK/verify" | canon | sort -u > "$WORK/changed"
-sed -n 's/^MISSING //p' "$WORK/verify" | canon | sort -u | grep -Ev -f "$WORK/exclude" > "$WORK/remove.list"
+sed -n 's/^MISSING //p' "$WORK/verify" | canon | sort -u | grep -Ev -f "$WORK/exclude" | grep -Ev -f "$WORK/never-remove" > "$WORK/remove.list"
 
 sort -u "$WORK/unowned" "$WORK/changed" | grep -Ev -f "$WORK/exclude" | sed 's#^/##' > "$WORK/layer"
 
