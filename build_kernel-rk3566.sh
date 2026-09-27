@@ -16,8 +16,15 @@ KERNEL_REPO=https://github.com/christianhaitian/kernel_5_10_226.git
 # as a hit and restore an incomplete tree. That is exactly how a pack missing
 # .config would have survived its own fix. Bump it whenever the tar list below
 # changes.
+# The RGB20SX is an RGB30 with an RTL8723DS radio and a 5000mAh battery, so its
+# dtb is the RGB30 one with those lines changed, generated below. Bump the token
+# when the substitutions change.
+RGB20SX_DTB=""
+if [ "$UNIT" = "rgb30" ]; then
+  RGB20SX_DTB="rk3566-rgb20sx-1"
+fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
-    "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" \
+    "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" \
     "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png" \
     "fmt2")"
 KERNEL_CACHE_ASSET="kernel-${UNIT}-${KERNEL_CACHE_KEY}.tar.zst"
@@ -62,6 +69,19 @@ if [ "$KERNEL_FROM_CACHE" != "y" ] && [[ -e "../logos/unrotated/dArkMoss${UNIT}.
   pngtopnm ../logos/unrotated/dArkMosshdmi.png | ppmquant 224 | pnmnoraw > drivers/video/logo/logo_hdmi_clut224.ppm
 fi
 
+if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RGB20SX_DTB" ]; then
+  sed -e 's/model = "Powkiddy RGB30.*"/model = "Powkiddy RGB20SX"/' \
+      -e 's/wifi_chip_type = "ap6330"/wifi_chip_type = "rtl8723ds"/' \
+      -e 's/"realtek,rtl8821cs-bt", "realtek,rtl8822cs-bt"/"realtek,rtl8723ds-bt", "realtek,rtl8723bs-bt"/' \
+      -e 's/design_capacity = <4100>/design_capacity = <5000>/' \
+      -e 's/design_qmax = <4100>/design_qmax = <5000>/' \
+      arch/arm64/boot/dts/rockchip/rk3566-rgb30.dts > arch/arm64/boot/dts/rockchip/rk3566-rgb20sx.dts
+  if [ "$(grep -c "rtl8723ds\|RGB20SX\|<5000>" arch/arm64/boot/dts/rockchip/rk3566-rgb20sx.dts)" != "5" ]; then
+    echo "ERROR: rk3566-rgb20sx.dts substitutions did not all apply."
+    exit 1
+  fi
+  echo 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3566-rgb20sx.dtb' >> arch/arm64/boot/dts/rockchip/Makefile
+fi
 if [ "$KERNEL_FROM_CACHE" != "y" ]; then
   make ARCH=arm64 rk3566_optimized_linux_defconfig
   CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 KERNEL_DTS=rk3566 KERNEL_CONFIG=rk3566_optimized_linux_defconfig
@@ -109,6 +129,7 @@ else
     sudo mkdir -p Arkbuild/usr/local/bin/rgb30dtbs/
     sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb Arkbuild/usr/local/bin/rgb30dtbs/${UNIT_DTB}.dtb.v1
     sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${UNIT_DTB}-v2.dtb Arkbuild/usr/local/bin/rgb30dtbs/${UNIT_DTB}.dtb.v2
+    sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/rk3566-rgb20sx.dtb Arkbuild/usr/local/bin/rgb30dtbs/
   fi
 fi
 
@@ -160,9 +181,11 @@ for bin in /sbin/fsck /sbin/logsave /sbin/e2fsck /sbin/fsck.ext4; do
 done
 # We also need to copy the 5.10 kernel compatible BT firmware files or BT will not initialize correctly
 mkdir -p lib/firmware/rtl_bt/
+# The RGB30 image gets both: the RGB20SX boots it with an RTL8723DS.
 if [[ "$UNIT" != "rgb20pro" ]] && [[ "$UNIT" != *"miniloong"* ]]; then
   sudo cp ../Arkbuild/usr/lib/firmware/rtl_bt/rtl8821cs_* lib/firmware/rtl_bt/
-else
+fi
+if [[ "$UNIT" == "rgb20pro" ]] || [[ "$UNIT" == *"miniloong"* ]] || [[ "$UNIT" == "rgb30" ]]; then
   sudo cp ../firmware/rtl8723ds/rtl8723ds_config.bin lib/firmware/rtl_bt/rtl8723d_config.bin
   sudo cp ../firmware/rtl8723ds/rtl8723ds_fw.bin lib/firmware/rtl_bt/rtl8723d_fw.bin
 fi
