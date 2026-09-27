@@ -156,3 +156,21 @@ esac
 if [ -n "$HW_DEVICE_NAME" ] && ! grep -q '^HW_DEVICE=' Arkbuild/etc/os-release 2>/dev/null; then
   echo "HW_DEVICE=\"$HW_DEVICE_NAME\"" | sudo tee -a Arkbuild/etc/os-release >/dev/null
 fi
+
+# The spruce platform name for this unit, so spruce needs no table of its own
+# to map HW_DEVICE strings: a new unit is one line here and its platform files
+# on the card.
+case "$UNIT" in
+  rgb30)     SPRUCE_PLATFORM_NAME="RGB30" ;;
+  miniloong) SPRUCE_PLATFORM_NAME="Miniloong" ;;
+  *)         SPRUCE_PLATFORM_NAME="" ;;
+esac
+if [ -n "$SPRUCE_PLATFORM_NAME" ] && ! grep -q '^SPRUCE_PLATFORM=' Arkbuild/etc/os-release 2>/dev/null; then
+  echo "SPRUCE_PLATFORM=\"$SPRUCE_PLATFORM_NAME\"" | sudo tee -a Arkbuild/etc/os-release >/dev/null
+fi
+
+# What spruce shows as the firmware version. The release tag when CI passes
+# one (DARKMOSS_VERSION), the build date otherwise.
+if ! grep -q '^OS_VERSION=' Arkbuild/etc/os-release 2>/dev/null; then
+  echo "OS_VERSION=\"${DARKMOSS_VERSION:-$BUILD_DATE}\"" | sudo tee -a Arkbuild/etc/os-release >/dev/null
+fi

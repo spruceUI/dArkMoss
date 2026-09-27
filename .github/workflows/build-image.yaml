@@ -133,6 +133,8 @@ jobs:
           # the "build-cache" release. Without a token it degrades to building
           # everything from scratch, exactly as before.
           GH_TOKEN: ${{ github.token }}
+          # Stamped into os-release as OS_VERSION; empty falls back to the build date.
+          DARKMOSS_VERSION: ${{ inputs.release_tag }}
         run: |
           chmod +x ./*.sh
           chmod +x ./scripts/ci/*.sh
