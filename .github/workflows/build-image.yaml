@@ -172,7 +172,13 @@ jobs:
             echo "::error::no *.img.7z produced - build did not reach image assembly"
             exit 1
           fi
-          echo "image(s) produced:"; ls -lh *.img.7z*
+          upd=( *.dmupd )
+          if [ ${#upd[@]} -eq 0 ]; then
+            echo "::error::no *.dmupd produced - build_update-rk3566.sh did not run or failed"
+            exit 1
+          fi
+          echo "image(s) produced:"; ls -lh *.img.7z* *.dmupd
+          sha256sum *.img.7z* *.dmupd > SHA256SUMS
 
       # Save the caches even when the build failed (but not when cancelled), so a
       # run that dies at the kernel or finishing_touches still seeds the ~1h
@@ -201,11 +207,17 @@ jobs:
           name: dArkMoss-${{ inputs.unit }}
           path: |
             *.img.7z*
+            *.dmupd
           if-no-files-found: warn
 
+      # SHA256SUMS here covers this unit only. A release with every unit comes
+      # from build-all.yaml, whose publish job writes one over all of them.
       - name: Publish release
         if: success() && inputs.release_tag != ''
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ inputs.release_tag }}
-          files: "*.img.7z*"
+          files: |
+            *.img.7z*
+            *.dmupd
+            SHA256SUMS

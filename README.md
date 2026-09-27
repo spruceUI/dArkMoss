@@ -75,6 +75,15 @@ workflow artifact. Images ship as `dArkMoss_<UNIT>_<suite>_<date>.img.7z.001`
 and `.002` because a single volume is over GitHub's asset limit; the parts are
 a plain byte split, so `cat` them (or let 7z read `.001`) to extract.
 
+Beside each image the build also produces `dArkMoss_<UNIT>_<tag>.dmupd`, an
+update payload spruce's Firmware Update app downloads and applies in place: the
+boot partition files plus every rootfs file the dArkMoss build added or changed
+(chosen by the dpkg database, see `build_update-rk3566.sh`), with the applier
+`scripts/spruce/dmupd-apply.sh` inside. A release carries a `SHA256SUMS` over
+all of its assets, which the app checks the download against. Untagged builds
+stamp the build date as the version, which the app treats as "unknown", so
+only tagged releases are offered as updates.
+
 Adding a unit that dArkOS already supports: copy `build_rgb30.sh` to
 `build_<unit>.sh` and change `UNIT`, add `logos/unrotated/dArkMoss<unit>.png`
 (the kernel boot logo), give it a name in the `HW_DEVICE` case in

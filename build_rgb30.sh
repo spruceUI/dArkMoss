@@ -106,6 +106,7 @@ source ./build_drmtool.sh
 source ./finishing_touches-rk3566.sh
 source ./setup_spruce_handoff-rk3566.sh
 source ./cleanup_filesystem.sh
+source ./build_update-rk3566.sh
 source ./write_rootfs-rk3566.sh
 source ./clean_mounts.sh
 source ./create_image.sh

@@ -52,10 +52,16 @@ jobs:
             echo "::error::no unit produced an image, nothing to release"
             exit 1
           fi
-          ls -lh *.img.7z*
+          # spruce's Firmware Update app checks the .dmupd it downloads against
+          # this file, so it has to cover every unit in the release.
+          sha256sum *.img.7z* *.dmupd > SHA256SUMS
+          ls -lh *.img.7z* *.dmupd SHA256SUMS
 
       - name: Publish release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ inputs.release_tag }}
-          files: "*.img.7z*"
+          files: |
+            *.img.7z*
+            *.dmupd
+            SHA256SUMS
