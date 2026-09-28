@@ -76,11 +76,12 @@ while IFS= read -r path; do
 done < "$WORK/remove.list"
 
 say "installing the rootfs layer"
-# --unlink-first replaces files by unlink and create, so binaries and libraries
-# in use keep running on the old inode. --keep-directory-symlink protects the
-# merged-/usr symlinks should a legacy /lib path ever appear in the layer, and
-# --no-overwrite-dir leaves the ownership and mode of existing directories alone.
-tar -xOf "$PAYLOAD" rootfs.tar.gz | tar -xzpf - -C / --numeric-owner --unlink-first --keep-directory-symlink --no-overwrite-dir \
+# tar replaces a file by unlinking it and creating a new one, so binaries and
+# libraries in use keep running on the old inode. --keep-directory-symlink
+# protects the merged-/usr symlinks should a legacy /lib path ever appear in the
+# layer; --no-overwrite-dir leaves existing directories' ownership and mode
+# alone (it cannot be combined with --unlink-first).
+tar -xOf "$PAYLOAD" rootfs.tar.gz | tar -xzpf - -C / --numeric-owner --keep-directory-symlink --no-overwrite-dir \
     || fail "rootfs layer did not extract cleanly"
 sync
 
@@ -109,5 +110,5 @@ if [ -n "$DTB_VARIANT" ] && [ -f "$DTBS/$DTB_VARIANT" ]; then
 fi
 sync
 
-say "done: $(sed -n 's/^OS_VERSION=//p' /etc/os-release) is installed, reboot to run it"
+say "done: $(sed -n 's/^OS_VERSION=//p' /etc/os-release | tr -d '"') is installed, reboot to run it"
 exit 0
