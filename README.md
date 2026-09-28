@@ -77,8 +77,9 @@ a plain byte split, so `cat` them (or let 7z read `.001`) to extract.
 
 Beside each image the build also produces `dArkMoss_<UNIT>_<tag>.dmupd`, an
 update payload spruce's Firmware Update app downloads and applies in place: the
-boot partition files plus every rootfs file the dArkMoss build added or changed
-(chosen by the dpkg database, see `build_update-rk3566.sh`), with the applier
+boot partition files, every rootfs file the dArkMoss build added or changed
+(chosen by the dpkg database, see `build_update-rk3566.sh`) and the U-Boot
+resource partition (dtb, charging animation, power-on logo), with the applier
 `scripts/spruce/dmupd-apply.sh` inside. A release carries a `SHA256SUMS` over
 all of its assets, which the app checks the download against. Untagged builds
 stamp the build date as the version, which the app treats as "unknown", so

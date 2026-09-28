@@ -6,11 +6,14 @@
 #   apply.sh <payload.dmupd>
 #
 # The payload is an uncompressed tar: manifest, apply.sh, remove.list,
-# boot.tar.gz (the boot partition) and rootfs.tar.gz (every file the dArkMoss
-# build added to or changed in the Debian rootfs). Both archives are checked
-# against the manifest before anything is written. The rootfs layer goes on
-# first, the boot files last, each renamed into place with the previous set
-# kept in /boot/previous. A reboot afterwards is the caller's job.
+# boot.tar.gz (the boot partition), rootfs.tar.gz (every file the dArkMoss
+# build added to or changed in the Debian rootfs) and resource.img.gz (U-Boot's
+# resource partition: dtb, charging animation, power-on logo). Everything is
+# checked against the manifest before anything is written. The rootfs layer
+# goes on first, then the boot files, renamed into place with the previous set
+# kept in /boot/previous, then the resource partition is written whole, so a
+# logo set with the Boot Logo app goes back to stock and that app has to be run
+# again. A reboot afterwards is the caller's job.
 
 set -u
 
@@ -33,6 +36,17 @@ GOT="$(tar -xOf "$PAYLOAD" rootfs.tar.gz | sha256sum | cut -d' ' -f1)"
 [ "$GOT" = "$(field rootfs_sha256)" ] || fail "rootfs.tar.gz checksum mismatch"
 GOT="$(tar -xOf "$PAYLOAD" boot.tar.gz | sha256sum | cut -d' ' -f1)"
 [ "$GOT" = "$(field boot_sha256)" ] || fail "boot.tar.gz checksum mismatch"
+RESOURCE_DEV=/dev/disk/by-partlabel/resource
+HAVE_RESOURCE=0
+if [ -n "$(field resource_sha256)" ]; then
+    GOT="$(tar -xOf "$PAYLOAD" resource.img.gz | gzip -dc | sha256sum | cut -d' ' -f1)"
+    [ "$GOT" = "$(field resource_sha256)" ] || fail "resource.img.gz checksum mismatch"
+    [ -b "$RESOURCE_DEV" ] || fail "no resource partition at $RESOURCE_DEV"
+    RESOURCE_SIZE="$(tar -xOf "$PAYLOAD" resource.img.gz | gzip -dc | wc -c)"
+    RESOURCE_MAX="$(blockdev --getsize64 "$RESOURCE_DEV" 2>/dev/null || echo 0)"
+    [ "$RESOURCE_SIZE" -le "$RESOURCE_MAX" ] || fail "resource image is $RESOURCE_SIZE bytes, partition is $RESOURCE_MAX"
+    HAVE_RESOURCE=1
+fi
 
 # The unit is in os-release; images from before the SPRUCE_PLATFORM stamp only
 # carry HW_DEVICE.
@@ -109,6 +123,13 @@ if [ -n "$DTB_VARIANT" ] && [ -f "$DTBS/$DTB_VARIANT" ]; then
     cp -f "$DTBS/$DTB_VARIANT" "$BOOT/rk3566-rgb30.dtb"
 fi
 sync
+
+if [ "$HAVE_RESOURCE" = 1 ]; then
+    say "writing the resource partition"
+    tar -xOf "$PAYLOAD" resource.img.gz | gzip -dc | dd of="$RESOURCE_DEV" bs=1M conv=fsync 2>/dev/null \
+        || fail "resource partition write failed; the boot files and rootfs are already updated"
+    sync
+fi
 
 say "done: $(sed -n 's/^OS_VERSION=//p' /etc/os-release | tr -d '"') is installed, reboot to run it"
 exit 0

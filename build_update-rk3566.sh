@@ -131,6 +131,12 @@ sudo tar -C ${mountpoint} --numeric-owner \
   -czf "$WORK/boot.tar.gz" .
 sudo umount ${mountpoint}
 
+# --- resource partition ------------------------------------------------------
+# U-Boot's resource partition (p2): its dtb, the off-charging animation and the
+# power-on logo. Not a filesystem, so it ships as the raw 4MB partition and the
+# applier writes it back whole, exactly as flashing the image would.
+sudo dd if=${LOOP_DEV}p2 bs=1M 2>/dev/null | gzip -c > "$WORK/resource.img.gz"
+
 # --- assemble ---------------------------------------------------------------
 KVER=$(basename "$(find Arkbuild/usr/lib/modules -maxdepth 1 -mindepth 1 -type d | head -n 1)")
 cat > "$WORK/manifest" <<EOF
@@ -142,6 +148,7 @@ build=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
 kernel=${KVER}
 boot_sha256=$(sha256sum "$WORK/boot.tar.gz" | cut -d' ' -f1)
 rootfs_sha256=$(sha256sum "$WORK/rootfs.tar.gz" | cut -d' ' -f1)
+resource_sha256=$(gzip -dc "$WORK/resource.img.gz" | sha256sum | cut -d' ' -f1)
 EOF
 cp scripts/spruce/dmupd-apply.sh "$WORK/apply.sh"
 chmod 0755 "$WORK/apply.sh"
@@ -150,7 +157,7 @@ sudo chown -R "$(id -u):$(id -g)" "$WORK"
 rm -f "$DMUPD"
 # Uncompressed outer tar, manifest first, so the head can be read without
 # touching the rest.
-tar -C "$WORK" --owner=0 --group=0 -cf "$DMUPD" manifest apply.sh remove.list boot.tar.gz rootfs.tar.gz
+tar -C "$WORK" --owner=0 --group=0 -cf "$DMUPD" manifest apply.sh remove.list boot.tar.gz rootfs.tar.gz resource.img.gz
 
 echo "Update payload: $DMUPD ($(du -h "$DMUPD" | cut -f1))"
 cat "$WORK/manifest"
