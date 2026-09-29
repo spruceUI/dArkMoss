@@ -21,12 +21,14 @@ KERNEL_REPO=https://github.com/christianhaitian/kernel_5_10_226.git
 # when the substitutions change.
 RGB20SX_DTB=""
 RGB30_TF2=""
+RTW88_TEST=""
 if [ "$UNIT" = "rgb30" ]; then
   RGB20SX_DTB="rk3566-rgb20sx-2"
   RGB30_TF2="rgb30-tf2-nouhs-1"
+  RTW88_TEST="rtw88-test-1"
 fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
-    "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" "${RGB30_TF2:-}" \
+    "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" "${RGB30_TF2:-}" "${RTW88_TEST:-}" \
     "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png" \
     "fmt2")"
 KERNEL_CACHE_ASSET="kernel-${UNIT}-${KERNEL_CACHE_KEY}.tar.zst"
@@ -108,6 +110,23 @@ if [ "$KERNEL_FROM_CACHE" != "y" ]; then
   verify_action
 fi
 cd ..
+
+# Test only: lwfinger/rtw88 (mainline rtw88 backport) for the RGB20SX's
+# RTL8723DS, built against this kernel and kept for the rtw88 artifact. Not
+# installed into the image. Non-fatal.
+if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RTW88_TEST" ]; then
+  rm -rf rtw88-src rtw88-out
+  git clone --depth=1 https://github.com/lwfinger/rtw88.git rtw88-src
+  make -k -j$(nproc) -C $KERNEL_SRC M=$PWD/rtw88-src ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules 2>&1 | tail -80
+  mkdir -p rtw88-out
+  for m in rtw_core rtw_sdio rtw_8723x rtw_8723d rtw_8723ds; do
+    cp rtw88-src/$m.ko rtw88-out/ || echo "rtw88: $m.ko was not built"
+  done
+  cp rtw88-src/firmware/rtw8723d_fw.bin rtw88-out/ 2>/dev/null || echo "rtw88: no rtw8723d_fw.bin in the repo"
+  git -C rtw88-src rev-parse HEAD > rtw88-out/rtw88-commit.txt
+  modinfo rtw88-out/rtw_8723ds.ko 2>/dev/null | grep -E "^(vermagic|alias)" | head -4
+  ls -l rtw88-out
+fi
 
 # Install kernel modules, then pack the installed results for the next build.
 # On a cache hit both trees are already in place from the tarball.

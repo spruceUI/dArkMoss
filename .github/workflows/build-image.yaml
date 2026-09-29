@@ -216,6 +216,13 @@ jobs:
             *.dmupd
           if-no-files-found: warn
 
+      - name: Upload rtw88 test modules
+        if: always() && hashFiles('rtw88-out/*') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtw88-${{ inputs.unit }}
+          path: rtw88-out/
+
       # SHA256SUMS here covers this unit only. A release with every unit comes
       # from build-all.yaml, whose publish job writes one over all of them.
       - name: Publish release
