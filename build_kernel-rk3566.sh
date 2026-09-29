@@ -20,11 +20,13 @@ KERNEL_REPO=https://github.com/christianhaitian/kernel_5_10_226.git
 # dtb is the RGB30 one with those lines changed, generated below. Bump the token
 # when the substitutions change.
 RGB20SX_DTB=""
+RGB30_TF2=""
 if [ "$UNIT" = "rgb30" ]; then
   RGB20SX_DTB="rk3566-rgb20sx-1"
+  RGB30_TF2="rgb30-tf2-nouhs-1"
 fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
-    "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" \
+    "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" "${RGB30_TF2:-}" \
     "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png" \
     "fmt2")"
 KERNEL_CACHE_ASSET="kernel-${UNIT}-${KERNEL_CACHE_KEY}.tar.zst"
@@ -81,6 +83,18 @@ if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RGB20SX_DTB" ]; then
     exit 1
   fi
   echo 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3566-rgb20sx.dtb' >> arch/arm64/boot/dts/rockchip/Makefile
+fi
+# RGB30 v1/v2: no UHS on TF2, some cards stall ~40s negotiating it at boot.
+# After the RGB20SX dts is generated, so the 20SX keeps UHS.
+if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RGB30_TF2" ]; then
+  for dts in rk3566-rgb30.dts rk3566-rgb30-v2.dts; do
+    f=arch/arm64/boot/dts/rockchip/$dts
+    grep -q "^&sdmmc1 {" "$f" && sed -i '/^&sdmmc1 {/,/^};/{/sd-uhs-/d}' "$f"
+    if ! grep -q "^&sdmmc1 {" "$f" || sed -n '/^&sdmmc1 {/,/^};/p' "$f" | grep -q "sd-uhs-"; then
+      echo "ERROR: TF2 UHS removal did not apply to $dts."
+      exit 1
+    fi
+  done
 fi
 if [ "$KERNEL_FROM_CACHE" != "y" ]; then
   make ARCH=arm64 rk3566_optimized_linux_defconfig
