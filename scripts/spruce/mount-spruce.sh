@@ -1,22 +1,52 @@
 #!/bin/sh
-# Wait for and mount the spruce card (TF2, a FAT partition labelled SPRUCEOS)
-# at /mnt/SDCARD, where spruce expects to find itself.
-#
-# Poll for the card rather than racing it: on the RGB30 the second SD can
-# enumerate a beat after userspace is up, and mounting too early was exactly
-# what broke the MossySpruce boot. 30s cap, then fail and let systemd retry.
+# Mount the spruce card at /mnt/SDCARD, where spruce expects to find itself.
+# The spruce card is whatever SD card is in the other slot: the first FAT or
+# exFAT partition on an SD card that is not the boot card. Its label does not
+# matter. No spruce after one retry: say so and power off.
+TTY=/dev/tty1
+
+say() {
+  printf '\033[2J\033[H\n\n  %s\n' "$1" > "$TTY" 2>/dev/null
+}
+
+find_spruce_card() {
+  root_disk=$(lsblk -no PKNAME "$(findmnt -no SOURCE / | sed 's/\[.*//')" 2>/dev/null)
+  for dev in /sys/block/mmcblk*; do
+    disk=${dev##*/}
+    [ "$disk" != "$root_disk" ] || continue
+    [ "$(cat "$dev/device/type" 2>/dev/null)" = SD ] || continue
+    lsblk -rno NAME,TYPE,FSTYPE "/dev/$disk" | while read -r name type fstype; do
+      [ "$type" = part ] || continue
+      case "$fstype" in
+        vfat|exfat) echo "/dev/$name"; break ;;
+      esac
+    done
+  done | head -n 1
+}
+
+mount_spruce() {
+  mountpoint -q /mnt/SDCARD && [ -f /mnt/SDCARD/spruce/scripts/runtime.sh ] && return 0
+  DEV=$(find_spruce_card)
+  [ -n "$DEV" ] || return 1
+  mountpoint -q /mnt/SDCARD || mount -o rw,noatime,umask=0000 "$DEV" /mnt/SDCARD || return 1
+  [ -f /mnt/SDCARD/spruce/scripts/runtime.sh ] && return 0
+  umount /mnt/SDCARD
+  return 1
+}
+
 mkdir -p /mnt/SDCARD
-i=0
-while [ "$i" -lt 30 ]; do
-  DEV=$(blkid -L SPRUCEOS 2>/dev/null)
-  [ -n "$DEV" ] && break
-  i=$((i + 1))
-  sleep 1
-done
-if [ -z "$DEV" ]; then
-  echo "spruce card (label SPRUCEOS) not found after 30s" >&2
-  exit 1
+mount_spruce && exit 0
+
+say "Looking for spruce card.........."
+sleep 5
+if mount_spruce; then
+  printf '\033[2J\033[H' > "$TTY" 2>/dev/null
+  exit 0
 fi
-if ! mountpoint -q /mnt/SDCARD; then
-  mount -o rw,noatime,umask=0000 "$DEV" /mnt/SDCARD
-fi
+
+say "spruce card not found, shutting down"
+echo "spruce card not found (${DEV:-no SD card besides the boot card}), powering off" >&2
+sleep 3
+systemctl poweroff
+sleep 60
+exit 1
