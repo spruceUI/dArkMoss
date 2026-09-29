@@ -31,7 +31,7 @@ DEPS_CACHE_ASSET="chroot-deps-${CHIPSET}-${BIT}-${DEPS_CACHE_KEY}.tar.zst"
 DEPS_FROM_CACHE=n
 
 if [ "$BIT" == "64" ] && bc_fetch "$DEPS_CACHE_ASSET" "chroot-deps.tar.zst"; then
-  if sudo tar --zstd -xf chroot-deps.tar.zst; then
+  if sudo tar --zstd -xf chroot-deps.tar.zst --exclude="${CHROOT_DIR}/usr/local/bin/rgb30dtbs"; then
     DEPS_FROM_CACHE=y
     echo "Prepared chroot restored from build cache; skipping package install and in-chroot builds."
   else
@@ -161,6 +161,7 @@ if [ "$BIT" == "64" ]; then
         --exclude="${CHROOT_DIR}/usr/lib/firmware" \
         --exclude="${CHROOT_DIR}/home/ark/Arkbuild_ccache" \
         --exclude="${CHROOT_DIR}/boot" \
+        --exclude="${CHROOT_DIR}/usr/local/bin/rgb30dtbs" \
         "${CHROOT_DIR}"; then
     bc_publish "$DEPS_CACHE_ASSET" chroot-deps.tar.zst
   else
