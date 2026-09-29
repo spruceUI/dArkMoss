@@ -77,6 +77,8 @@ DTBS=/usr/local/bin/rgb30dtbs
 if [ -f "$BOOT/rk3566-rgb30.dtb" ] && [ -d "$DTBS" ]; then
     if cmp -s "$DTBS/rk3566-rgb20sx.dtb" "$BOOT/rk3566-rgb30.dtb"; then
         DTB_VARIANT="rk3566-rgb20sx.dtb"
+    elif cmp -s "$DTBS/rk3566-rgb20sx.dtb.v2" "$BOOT/rk3566-rgb30.dtb"; then
+        DTB_VARIANT="rk3566-rgb20sx.dtb.v2"
     elif cmp -s "$DTBS/rk3566-rgb30.dtb.v2" "$BOOT/rk3566-rgb30.dtb"; then
         DTB_VARIANT="rk3566-rgb30.dtb.v2"
     fi

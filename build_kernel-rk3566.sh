@@ -22,7 +22,7 @@ KERNEL_REPO=https://github.com/christianhaitian/kernel_5_10_226.git
 RGB20SX_DTB=""
 RGB30_TF2=""
 if [ "$UNIT" = "rgb30" ]; then
-  RGB20SX_DTB="rk3566-rgb20sx-1"
+  RGB20SX_DTB="rk3566-rgb20sx-2"
   RGB30_TF2="rgb30-tf2-nouhs-1"
 fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
@@ -71,18 +71,24 @@ if [ "$KERNEL_FROM_CACHE" != "y" ] && [[ -e "../logos/unrotated/dArkMoss${UNIT}.
   pngtopnm ../logos/unrotated/dArkMosshdmi.png | ppmquant 224 | pnmnoraw > drivers/video/logo/logo_hdmi_clut224.ppm
 fi
 
+# Like the RGB30, the 20SX ships with either CPU regulator (i2c 0x1c or 0x40),
+# so it gets a dtb from each RGB30 source.
 if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RGB20SX_DTB" ]; then
-  sed -e 's/model = "Powkiddy RGB30.*"/model = "Powkiddy RGB20SX"/' \
-      -e 's/wifi_chip_type = "ap6330"/wifi_chip_type = "rtl8723ds"/' \
-      -e 's/"realtek,rtl8821cs-bt", "realtek,rtl8822cs-bt"/"realtek,rtl8723ds-bt", "realtek,rtl8723bs-bt"/' \
-      -e 's/design_capacity = <4100>/design_capacity = <5000>/' \
-      -e 's/design_qmax = <4100>/design_qmax = <5000>/' \
-      arch/arm64/boot/dts/rockchip/rk3566-rgb30.dts > arch/arm64/boot/dts/rockchip/rk3566-rgb20sx.dts
-  if [ "$(grep -c "rtl8723ds\|RGB20SX\|<5000>" arch/arm64/boot/dts/rockchip/rk3566-rgb20sx.dts)" != "5" ]; then
-    echo "ERROR: rk3566-rgb20sx.dts substitutions did not all apply."
-    exit 1
-  fi
-  echo 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3566-rgb20sx.dtb' >> arch/arm64/boot/dts/rockchip/Makefile
+  for pair in rk3566-rgb30:rk3566-rgb20sx rk3566-rgb30-v2:rk3566-rgb20sx-v2; do
+    src=arch/arm64/boot/dts/rockchip/${pair%%:*}.dts
+    dst=arch/arm64/boot/dts/rockchip/${pair##*:}.dts
+    sed -e 's/model = "Powkiddy RGB30.*"/model = "Powkiddy RGB20SX"/' \
+        -e 's/wifi_chip_type = "ap6330"/wifi_chip_type = "rtl8723ds"/' \
+        -e 's/"realtek,rtl8821cs-bt", "realtek,rtl8822cs-bt"/"realtek,rtl8723ds-bt", "realtek,rtl8723bs-bt"/' \
+        -e 's/design_capacity = <4100>/design_capacity = <5000>/' \
+        -e 's/design_qmax = <4100>/design_qmax = <5000>/' \
+        "$src" > "$dst"
+    if [ "$(grep -c "rtl8723ds\|RGB20SX\|<5000>" "$dst")" != "5" ]; then
+      echo "ERROR: $dst substitutions did not all apply."
+      exit 1
+    fi
+    echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += ${pair##*:}.dtb" >> arch/arm64/boot/dts/rockchip/Makefile
+  done
 fi
 # RGB30 v1/v2: no UHS on TF2, some cards stall ~40s negotiating it at boot.
 # After the RGB20SX dts is generated, so the 20SX keeps UHS.
@@ -144,6 +150,7 @@ else
     sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb Arkbuild/usr/local/bin/rgb30dtbs/${UNIT_DTB}.dtb.v1
     sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${UNIT_DTB}-v2.dtb Arkbuild/usr/local/bin/rgb30dtbs/${UNIT_DTB}.dtb.v2
     sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/rk3566-rgb20sx.dtb Arkbuild/usr/local/bin/rgb30dtbs/
+    sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/rk3566-rgb20sx-v2.dtb Arkbuild/usr/local/bin/rgb30dtbs/rk3566-rgb20sx.dtb.v2
   fi
 fi
 
