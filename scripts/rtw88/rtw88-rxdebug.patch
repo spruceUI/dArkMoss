@@ -1,0 +1,40 @@
+--- a/sdio.c
++++ b/sdio.c
+@@ -999,6 +999,12 @@
+ 		rx_buf = rx_desc + pkt_desc_sz;
+ 		rtw_rx_query_rx_desc(rtwdev, rx_desc, rx_buf,
+ 				     &pkt_stat, &rx_status);
++		rtw_dbg(rtwdev, RTW_DBG_SDIO,
++			"rxdbg rx_len=%u bufsz=%zu pkt_len=%u drv_info=%u shift=%u c2h=%d crc=%d icv=%d phy=%d rate=%u desc=%*ph\n",
++			rx_len, bufsz, pkt_stat.pkt_len, pkt_stat.drv_info_sz,
++			pkt_stat.shift, pkt_stat.is_c2h, pkt_stat.crc_err,
++			pkt_stat.icv_err, pkt_stat.phy_status, pkt_stat.rate,
++			(int)pkt_desc_sz, rx_desc);
+ 		pkt_offset = pkt_desc_sz + pkt_stat.drv_info_sz +
+ 			     pkt_stat.shift;
+ 
+@@ -1084,6 +1090,24 @@
+ 	rtwsdio->irq_thread = current;
+ 
+ 	hisr = rtw_read32(rtwdev, REG_SDIO_HISR);
++	if (rtw_dbg_is_enabled(rtwdev, RTW_DBG_SDIO)) {
++		static unsigned int hisrdbg_n;
++		u32 hisr8 = rtw_read8(rtwdev, REG_SDIO_HISR) |
++			    rtw_read8(rtwdev, REG_SDIO_HISR + 1) << 8 |
++			    rtw_read8(rtwdev, REG_SDIO_HISR + 2) << 16 |
++			    rtw_read8(rtwdev, REG_SDIO_HISR + 3) << 24;
++		u32 rxlen32 = rtw_read32(rtwdev, REG_SDIO_RX0_REQ_LEN);
++		u32 rxlen8 = rtw_read8(rtwdev, REG_SDIO_RX0_REQ_LEN) |
++			     rtw_read8(rtwdev, REG_SDIO_RX0_REQ_LEN + 1) << 8 |
++			     rtw_read8(rtwdev, REG_SDIO_RX0_REQ_LEN + 2) << 16 |
++			     rtw_read8(rtwdev, REG_SDIO_RX0_REQ_LEN + 3) << 24;
++
++		if ((hisr || hisr8 || rxlen32 || rxlen8) && hisrdbg_n++ < 300)
++			rtw_dbg(rtwdev, RTW_DBG_SDIO,
++				"hisrdbg n=%u hisr32=0x%08x hisr8=0x%08x rxlen32=0x%08x rxlen8=0x%08x rxlen16=0x%04x\n",
++				hisrdbg_n, hisr, hisr8, rxlen32, rxlen8,
++				rtw_read16(rtwdev, REG_SDIO_RX0_REQ_LEN));
++	}
+ 
+ 	if (hisr & REG_SDIO_HISR_TXERR)
+ 		rtw_sdio_tx_err_isr(rtwdev);

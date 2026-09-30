@@ -25,7 +25,7 @@ RTW88_TEST=""
 if [ "$UNIT" = "rgb30" ]; then
   RGB20SX_DTB="rk3566-rgb20sx-2"
   RGB30_TF2="rgb30-tf2-nouhs-1"
-  RTW88_TEST="rtw88-test-1"
+  RTW88_TEST="rtw88-test-2"
 fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
     "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" "${RGB30_TF2:-}" "${RTW88_TEST:-}" \
@@ -116,7 +116,9 @@ cd ..
 # installed into the image. Non-fatal.
 if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RTW88_TEST" ]; then
   rm -rf rtw88-src rtw88-out
-  git clone --depth=1 https://github.com/lwfinger/rtw88.git rtw88-src
+  git clone https://github.com/lwfinger/rtw88.git rtw88-src
+  git -C rtw88-src checkout -q a56bcd26e770257612a0803249cbd4095fc6feca
+  patch -p1 -d rtw88-src < scripts/rtw88/rtw88-rxdebug.patch || echo "rtw88: rxdebug patch did not apply"
   make -k -j$(nproc) -C $KERNEL_SRC M=$PWD/rtw88-src ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules 2>&1 | tail -80
   mkdir -p rtw88-out
   for m in rtw_core rtw_sdio rtw_8723x rtw_8723d rtw_8723ds; do
