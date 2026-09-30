@@ -1,0 +1,98 @@
+diff --git a/sdio.c b/sdio.c
+index f789288..75d83f3 100644
+--- a/sdio.c
++++ b/sdio.c
+@@ -504,6 +504,10 @@ static u32 rtw_sdio_get_tx_addr(struct rtw_dev *rtwdev, size_t size,
+ 	return txaddr;
+ };
+ 
++static unsigned int rx_chunk;
++module_param(rx_chunk, uint, 0644);
++MODULE_PARM_DESC(rx_chunk, "Split RX FIFO reads into CMD53s of this many bytes (0 = off)");
++
+ static int rtw_sdio_read_port(struct rtw_dev *rtwdev, u8 *buf, size_t count)
+ {
+ 	struct rtw_sdio *rtwsdio = (struct rtw_sdio *)rtwdev->priv;
+@@ -518,6 +522,8 @@ static int rtw_sdio_read_port(struct rtw_dev *rtwdev, u8 *buf, size_t count)
+ 
+ 	while (count > 0) {
+ 		bytes = min_t(size_t, host->max_req_size, count);
++		if (rx_chunk)
++			bytes = min_t(size_t, bytes, rx_chunk);
+ 
+ 		err = sdio_memcpy_fromio(rtwsdio->sdio_func, buf,
+ 					 RTW_SDIO_ADDR_RX_RX0FF_GEN(rxaddr),
+@@ -749,8 +755,73 @@ static int rtw_sdio_setup(struct rtw_dev *rtwdev)
+ 	return 0;
+ }
+ 
++static void rtw_sdio_selftest_one(struct rtw_dev *rtwdev, const char *name,
++				  u32 base, const u32 *sizes, int nsizes)
++{
++	struct rtw_sdio *rtwsdio = (struct rtw_sdio *)rtwdev->priv;
++	struct sdio_func *func = rtwsdio->sdio_func;
++	u32 max = sizes[nsizes - 1];
++	u8 *ref, *ref2, *buf;
++	int i, j, ret, err, bad, vol;
++
++	ref = kmalloc(max, GFP_KERNEL);
++	ref2 = kmalloc(max, GFP_KERNEL);
++	buf = kmalloc(max, GFP_KERNEL);
++	if (!ref || !ref2 || !buf)
++		goto out;
++
++	sdio_claim_host(func);
++	for (j = 0; j < max; j++)
++		ref[j] = sdio_readb(func, base + j, &err);
++	for (i = 0; i < nsizes; i++) {
++		memset(buf, 0x5a, max);
++		ret = sdio_memcpy_fromio(func, buf, base, sizes[i]);
++		for (j = 0; j < max; j++)
++			ref2[j] = sdio_readb(func, base + j, &err);
++		bad = 0;
++		vol = 0;
++		for (j = 0; j < sizes[i]; j++) {
++			if (ref[j] != ref2[j])
++				vol++;
++			else if (buf[j] != ref[j])
++				bad++;
++		}
++		pr_info("sdiotest %s base=0x%05x size=%u ret=%d bad=%d volatile=%d\n",
++			name, base, sizes[i], ret, bad, vol);
++		pr_info("sdiotest %s   cmd53 %*ph\n", name, min_t(u32, sizes[i], 32), buf);
++		pr_info("sdiotest %s   cmd52 %*ph\n", name, min_t(u32, sizes[i], 32), ref);
++		if (sizes[i] > 32) {
++			pr_info("sdiotest %s   cmd53@end %*ph\n", name, 16, buf + sizes[i] - 16);
++			pr_info("sdiotest %s   cmd52@end %*ph\n", name, 16, ref + sizes[i] - 16);
++		}
++	}
++	sdio_release_host(func);
++out:
++	kfree(ref);
++	kfree(ref2);
++	kfree(buf);
++}
++
++static void rtw_sdio_selftest(struct rtw_dev *rtwdev)
++{
++	static const u32 local_sizes[] = { 4, 8, 12, 16, 32, 64, 128, 256 };
++	static const u32 mac_sizes[] = { 4, 8, 16, 64, 256, 340, 512, 1024 };
++	static unsigned int runs;
++
++	if (runs++ >= 2)
++		return;
++	pr_info("sdiotest rx_chunk=%u\n", rx_chunk);
++	rtw_sdio_selftest_one(rtwdev, "local",
++			      rtw_sdio_to_bus_offset(rtwdev, SDIO_LOCAL_OFFSET),
++			      local_sizes, ARRAY_SIZE(local_sizes));
++	rtw_sdio_selftest_one(rtwdev, "mac",
++			      rtw_sdio_to_bus_offset(rtwdev, WLAN_IOREG_OFFSET),
++			      mac_sizes, ARRAY_SIZE(mac_sizes));
++}
++
+ static int rtw_sdio_start(struct rtw_dev *rtwdev)
+ {
++	rtw_sdio_selftest(rtwdev);
+ 	rtw_sdio_enable_rx_aggregation(rtwdev);
+ 	rtw_sdio_enable_interrupt(rtwdev);
+ 

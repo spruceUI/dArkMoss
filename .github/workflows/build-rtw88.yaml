@@ -1,0 +1,74 @@
+name: build-rtw88
+
+on:
+  push:
+    branches: [rtw88-test]
+    paths:
+      - "scripts/rtw88/**"
+      - ".github/workflows/build-rtw88.yaml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      KERNEL_REPO: https://github.com/christianhaitian/kernel_5_10_226.git
+      KERNEL_SHA: 2120c5ebc9
+      RTW88_SHA: a56bcd26e770257612a0803249cbd4095fc6feca
+      TCNAME: gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore the aarch64 toolchain cache
+        id: toolchain-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .toolchain-cache
+          key: darkmoss-toolchain-linaro-6.3.1-2017.05
+
+      - name: Prerequisites
+        run: sudo apt-get update && sudo apt-get install -y bc bison flex libssl-dev
+
+      - name: Toolchain
+        run: |
+          LOCAL="$PWD/.toolchain-cache/$TCNAME"
+          if [ ! -x "$LOCAL/bin/aarch64-linux-gnu-ld" ]; then
+            mkdir -p .toolchain-cache
+            git clone --depth=1 https://github.com/christianhaitian/${TCNAME}.git "$LOCAL"
+          fi
+          echo "$LOCAL/bin" >> "$GITHUB_PATH"
+
+      - name: Prepare the kernel tree
+        run: |
+          git clone --depth=50 "$KERNEL_REPO" kernel
+          git -C kernel checkout -q "$KERNEL_SHA"
+          touch kernel/.scmversion
+          make -C kernel ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- rk3566_optimized_linux_defconfig
+          make -C kernel ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) modules_prepare
+          cat kernel/include/config/kernel.release
+
+      - name: Build rtw88
+        run: |
+          git clone https://github.com/lwfinger/rtw88.git rtw88-src
+          git -C rtw88-src checkout -q "$RTW88_SHA"
+          for p in scripts/rtw88/rtw88-rxdebug.patch scripts/rtw88/rtw88-selftest.patch; do
+            patch -p1 -d rtw88-src < $p
+          done
+          make -j$(nproc) -C kernel M=$PWD/rtw88-src ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+            KBUILD_MODPOST_WARN=1 modules 2>&1 | tee rtw88-build.log
+          mkdir -p rtw88-out
+          for m in rtw_core rtw_sdio rtw_8723x rtw_8723d rtw_8723ds; do
+            cp rtw88-src/$m.ko rtw88-out/
+          done
+          cp rtw88-src/firmware/rtw8723d_fw.bin rtw88-out/
+          git -C rtw88-src rev-parse HEAD > rtw88-out/rtw88-commit.txt
+          cp rtw88-build.log rtw88-out/
+          vm=$(modinfo -F vermagic rtw88-out/rtw_sdio.ko)
+          echo "vermagic: $vm"
+          case "$vm" in "5.10.226 SMP mod_unload aarch64"*) ;; *) echo "::error::vermagic mismatch"; exit 1;; esac
+          strings rtw88-out/rtw_sdio.ko | grep -q "sdiotest" || { echo "::error::selftest missing"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rtw88-modules
+          path: rtw88-out
