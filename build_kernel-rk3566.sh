@@ -17,12 +17,12 @@ KERNEL_REPO=https://github.com/christianhaitian/kernel_5_10_226.git
 # .config would have survived its own fix. Bump it whenever the tar list below
 # changes.
 # The RGB20SX is an RGB30 with an RTL8723DS radio and a 5000mAh battery, so its
-# dtb is the RGB30 one with those lines changed, generated below. Bump the token
-# when the substitutions change.
+# dtb is the RGB30 one with those lines changed, generated below, as upstream
+# does for the RGB20 Pro (e394cf6). Bump the token when the substitutions change.
 RGB20SX_DTB=""
 RGB30_TF2=""
 if [ "$UNIT" = "rgb30" ]; then
-  RGB20SX_DTB="rk3566-rgb20sx-2"
+  RGB20SX_DTB="rk3566-rgb20sx-3"
   RGB30_TF2="rgb30-tf2-nouhs-1"
 fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
@@ -82,8 +82,10 @@ if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RGB20SX_DTB" ]; then
         -e 's/"realtek,rtl8821cs-bt", "realtek,rtl8822cs-bt"/"realtek,rtl8723ds-bt", "realtek,rtl8723bs-bt"/' \
         -e 's/design_capacity = <4100>/design_capacity = <5000>/' \
         -e 's/design_qmax = <4100>/design_qmax = <5000>/' \
+        -e '/device-wake-gpios = <&gpio4 RK_PA4/d' \
+        -e '/host-wake-gpios = <&gpio4 RK_PA5/d' \
         "$src" > "$dst"
-    if [ "$(grep -c "rtl8723ds\|RGB20SX\|<5000>" "$dst")" != "5" ]; then
+    if [ "$(grep -c "rtl8723ds\|RGB20SX\|<5000>" "$dst")" != "5" ] || grep -q "wake-gpios" "$dst"; then
       echo "ERROR: $dst substitutions did not all apply."
       exit 1
     fi
