@@ -51,7 +51,7 @@ jobs:
         run: |
           git clone https://github.com/lwfinger/rtw88.git rtw88-src
           git -C rtw88-src checkout -q "$RTW88_SHA"
-          for p in scripts/rtw88/rtw88-rxdebug.patch scripts/rtw88/rtw88-selftest.patch scripts/rtw88/rtw88-rxagg.patch; do
+          for p in scripts/rtw88/rtw88-rxdebug.patch scripts/rtw88/rtw88-selftest.patch scripts/rtw88/rtw88-rxagg.patch scripts/rtw88/rtw88-cccr.patch; do
             patch -p1 -d rtw88-src < $p
           done
           make -j$(nproc) -C kernel M=$PWD/rtw88-src ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \

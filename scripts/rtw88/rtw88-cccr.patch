@@ -1,0 +1,62 @@
+diff --git a/sdio.c b/sdio.c
+index 3aeca5c..a1b8ad3 100644
+--- a/sdio.c
++++ b/sdio.c
+@@ -806,6 +806,49 @@ out:
+ 	kfree(buf);
+ }
+ 
++static void rtw_sdio_dump_cccr(struct rtw_dev *rtwdev)
++{
++	struct rtw_sdio *rtwsdio = (struct rtw_sdio *)rtwdev->priv;
++	struct sdio_func *func = rtwsdio->sdio_func;
++	struct mmc_card *card = func->card;
++	struct mmc_host *host = card->host;
++	u8 buf[32];
++	int i, err;
++
++	sdio_claim_host(func);
++	for (i = 0; i < 32; i++)
++		buf[i] = sdio_f0_readb(func, i, &err);
++	pr_info("sdiocccr f0 0x00 %*ph\n", 16, buf);
++	pr_info("sdiocccr f0 0x10 %*ph\n", 16, buf + 16);
++	for (i = 0; i < 32; i++)
++		buf[i] = sdio_f0_readb(func, 0x100 + i, &err);
++	pr_info("sdiocccr fbr1 0x100 %*ph\n", 16, buf);
++	pr_info("sdiocccr fbr1 0x110 %*ph\n", 16, buf + 16);
++	sdio_release_host(func);
++
++	pr_info("sdiocccr cccr sdio_vsn=%u sd_vsn=%u multi_block=%u low_speed=%u wide_bus=%u high_power=%u high_speed=%u disable_cd=%u\n",
++		card->cccr.sdio_vsn, card->cccr.sd_vsn, card->cccr.multi_block,
++		card->cccr.low_speed, card->cccr.wide_bus, card->cccr.high_power,
++		card->cccr.high_speed, card->cccr.disable_cd);
++	pr_info("sdiocccr card type=%u state=0x%x quirks=0x%x ocr=0x%08x sw_caps.sd3_bus_mode=0x%x sd3_drv_type=0x%x hs_max_dtr=%u uhs_max_dtr=%u\n",
++		card->type, card->state, card->quirks, card->ocr,
++		card->sw_caps.sd3_bus_mode, card->sw_caps.sd3_drv_type,
++		card->sw_caps.hs_max_dtr, card->sw_caps.uhs_max_dtr);
++	pr_info("sdiocccr cis vendor=0x%04x device=0x%04x blksize=%u max_dtr=%u\n",
++		card->cis.vendor, card->cis.device, card->cis.blksize, card->cis.max_dtr);
++	pr_info("sdiocccr func num=%u class=0x%x max_blksize=%u cur_blksize=%u enable_timeout=%u\n",
++		func->num, func->class, func->max_blksize, func->cur_blksize,
++		func->enable_timeout);
++	pr_info("sdiocccr host caps=0x%08x caps2=0x%08x restrict_caps=0x%08x pm_caps=0x%x ocr_avail=0x%08x max_req=%u max_seg=%u max_segs=%u max_blk_size=%u max_blk_count=%u\n",
++		host->caps, host->caps2, host->restrict_caps, host->pm_caps, host->ocr_avail, host->max_req_size,
++		host->max_seg_size, host->max_segs, host->max_blk_size,
++		host->max_blk_count);
++	pr_info("sdiocccr ios clock=%u vdd=%u bus_width=%u timing=%u signal_voltage=%u drv_type=%u actual_clock=%u\n",
++		host->ios.clock, host->ios.vdd, host->ios.bus_width,
++		host->ios.timing, host->ios.signal_voltage,
++		host->ios.drv_type, host->actual_clock);
++}
++
+ static void rtw_sdio_selftest(struct rtw_dev *rtwdev)
+ {
+ 	static const u32 local_sizes[] = { 4, 8, 12, 16, 32, 64, 128, 256 };
+@@ -814,6 +857,7 @@ static void rtw_sdio_selftest(struct rtw_dev *rtwdev)
+ 
+ 	if (runs++ >= 2)
+ 		return;
++	rtw_sdio_dump_cccr(rtwdev);
+ 	pr_info("sdiotest rx_chunk=%u\n", rx_chunk);
+ 	rtw_sdio_selftest_one(rtwdev, "local",
+ 			      rtw_sdio_to_bus_offset(rtwdev, SDIO_LOCAL_OFFSET),
