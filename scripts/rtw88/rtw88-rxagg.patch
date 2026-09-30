@@ -1,0 +1,25 @@
+diff --git a/sdio.c b/sdio.c
+index 75d83f3..3aeca5c 100644
+--- a/sdio.c
++++ b/sdio.c
+@@ -504,6 +504,10 @@ static u32 rtw_sdio_get_tx_addr(struct rtw_dev *rtwdev, size_t size,
+ 	return txaddr;
+ };
+ 
++static bool rx_agg = true;
++module_param(rx_agg, bool, 0444);
++MODULE_PARM_DESC(rx_agg, "Enable SDIO RX aggregation (default: true)");
++
+ static unsigned int rx_chunk;
+ module_param(rx_chunk, uint, 0644);
+ MODULE_PARM_DESC(rx_chunk, "Split RX FIFO reads into CMD53s of this many bytes (0 = off)");
+@@ -822,7 +826,8 @@ static void rtw_sdio_selftest(struct rtw_dev *rtwdev)
+ static int rtw_sdio_start(struct rtw_dev *rtwdev)
+ {
+ 	rtw_sdio_selftest(rtwdev);
+-	rtw_sdio_enable_rx_aggregation(rtwdev);
++	if (rx_agg)
++		rtw_sdio_enable_rx_aggregation(rtwdev);
+ 	rtw_sdio_enable_interrupt(rtwdev);
+ 
+ 	return 0;
