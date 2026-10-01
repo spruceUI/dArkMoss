@@ -7,13 +7,15 @@
 #
 # The payload is an uncompressed tar: manifest, apply.sh, remove.list,
 # boot.tar.gz (the boot partition), rootfs.tar.gz (every file the dArkMoss
-# build added to or changed in the Debian rootfs) and resource.img.gz (U-Boot's
-# resource partition: dtb, charging animation, power-on logo). Everything is
-# checked against the manifest before anything is written. The rootfs layer
-# goes on first, then the boot files, renamed into place with the previous set
-# kept in /boot/previous, then the resource partition is written whole, so a
-# logo set with the Boot Logo app goes back to stock and that app has to be run
-# again. A reboot afterwards is the caller's job.
+# build added to or changed in the Debian rootfs), packages.tar.gz (every
+# package that differs from dmupd-baseline.txt, whole, with its dpkg records)
+# and resource.img.gz (U-Boot's resource partition: dtb, charging animation,
+# power-on logo). Everything is checked against the manifest before anything
+# is written. The rootfs layer and the packages go on first, then the boot
+# files, renamed into place with the previous set kept in /boot/previous, then
+# the resource partition is written whole, so a logo set with the Boot Logo app
+# goes back to stock and that app has to be run again. A reboot afterwards is
+# the caller's job.
 
 set -u
 
@@ -36,6 +38,12 @@ GOT="$(tar -xOf "$PAYLOAD" rootfs.tar.gz | sha256sum | cut -d' ' -f1)"
 [ "$GOT" = "$(field rootfs_sha256)" ] || fail "rootfs.tar.gz checksum mismatch"
 GOT="$(tar -xOf "$PAYLOAD" boot.tar.gz | sha256sum | cut -d' ' -f1)"
 [ "$GOT" = "$(field boot_sha256)" ] || fail "boot.tar.gz checksum mismatch"
+HAVE_PACKAGES=0
+if [ -n "$(field packages_sha256)" ]; then
+    GOT="$(tar -xOf "$PAYLOAD" packages.tar.gz | sha256sum | cut -d' ' -f1)"
+    [ "$GOT" = "$(field packages_sha256)" ] || fail "packages.tar.gz checksum mismatch"
+    HAVE_PACKAGES=1
+fi
 RESOURCE_DEV=/dev/disk/by-partlabel/resource
 HAVE_RESOURCE=0
 if [ -n "$(field resource_sha256)" ]; then
@@ -100,6 +108,38 @@ say "installing the rootfs layer"
 tar -xOf "$PAYLOAD" rootfs.tar.gz | tar -xzpf - -C / --numeric-owner --keep-directory-symlink --no-overwrite-dir \
     || fail "rootfs layer did not extract cleanly"
 sync
+
+if [ "$HAVE_PACKAGES" = 1 ]; then
+    tar -xOf "$PAYLOAD" packages.tar.gz | tar -xzf - -C "$WORK" pkgmeta || fail "package records did not extract"
+    say "installing $(wc -l < "$WORK/pkgmeta/keys") packages"
+    for arch in $(field foreign_arches); do
+        dpkg --add-architecture "$arch"
+    done
+    while IFS=: read -r gname _ _ _; do
+        getent group "$gname" >/dev/null || groupadd -r "$gname"
+    done < "$WORK/pkgmeta/group"
+    while IFS=: read -r uname _ _ ugid gecos home shell; do
+        getent passwd "$uname" >/dev/null && continue
+        gname="$(awk -F: -v g="$ugid" '$3 == g {print $1; exit}' "$WORK/pkgmeta/group")"
+        useradd -r -M -d "$home" -s "$shell" -c "$gecos" ${gname:+-g "$gname"} "$uname"
+    done < "$WORK/pkgmeta/passwd"
+    tar -xOf "$PAYLOAD" packages.tar.gz | tar -xzpf - -C / --numeric-owner --keep-directory-symlink --no-overwrite-dir --exclude=pkgmeta \
+        || fail "packages did not extract cleanly"
+    STATUS=/var/lib/dpkg/status
+    cp -p "$STATUS" "$STATUS-old"
+    awk -v keys="$WORK/pkgmeta/keys" '
+      BEGIN { while ((getline line < keys) > 0) skip[line] = 1; RS = ""; ORS = "\n\n" }
+      { name = arch = ""
+        n = split($0, f, "\n")
+        for (i = 1; i <= n; i++) {
+          if (f[i] ~ /^Package: /) name = substr(f[i], 10)
+          if (f[i] ~ /^Architecture: /) arch = substr(f[i], 15)
+        }
+        if (!((name " " arch) in skip)) print }
+    ' "$STATUS-old" > "$STATUS.dmupd" && cat "$WORK/pkgmeta/status" >> "$STATUS.dmupd" \
+        && mv "$STATUS.dmupd" "$STATUS" || fail "dpkg status merge failed; $STATUS-old is the previous one"
+    sync
+fi
 
 # The layer carries the build's enable symlinks; firstboot has already run here.
 systemctl disable firstboot.service >/dev/null 2>&1

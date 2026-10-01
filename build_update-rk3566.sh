@@ -120,6 +120,49 @@ sudo bash -c 'cd Arkbuild && xargs -d "\n" stat -c "%s %F %n" 2>/dev/null' < "$W
 
 sudo tar -C Arkbuild --numeric-owner --no-recursion -T "$WORK/layer" -czf "$WORK/rootfs.tar.gz"
 
+# --- packages ------------------------------------------------------------------
+# Every package not in dmupd-baseline.txt at the same version ships whole, with
+# its dpkg records, so an updated device ends up with the same package set as a
+# fresh flash.
+sudo chroot Arkbuild dpkg-query -W -f '${db:Status-Status} ${Package}:${Architecture} ${Version}\n' \
+  | awk '$1 == "installed" {print $2" "$3}' | sort > "$WORK/installed"
+comm -23 "$WORK/installed" dmupd-baseline.txt > "$WORK/new-packages"
+mkdir -p "$WORK/pkgmeta"
+: > "$WORK/pkgfiles"
+: > "$WORK/pkgkeys"
+while read -r key version; do
+  name="${key%%:*}"
+  arch="${key##*:}"
+  info="var/lib/dpkg/info/${name}:${arch}"
+  [ -f "Arkbuild/${info}.list" ] || info="var/lib/dpkg/info/${name}"
+  [ -f "Arkbuild/${info}.list" ] || continue
+  echo "${name} ${arch}" >> "$WORK/pkgkeys"
+  for ext in list md5sums conffiles preinst postinst prerm postrm triggers shlibs symbols templates config; do
+    [ -e "Arkbuild/${info}.${ext}" ] && echo "${info}.${ext}" >> "$WORK/pkgfiles"
+  done
+  sudo cat "Arkbuild/${info}.list" | canon | grep -Ev -f "$WORK/exclude" | while read -r path; do
+    [ -L "Arkbuild$path" ] || [ -f "Arkbuild$path" ] && echo "${path#/}"
+  done >> "$WORK/pkgfiles"
+done < "$WORK/new-packages"
+sudo awk -v keys="$WORK/pkgkeys" '
+  BEGIN { while ((getline line < keys) > 0) want[line] = 1; RS = ""; ORS = "\n\n" }
+  { name = arch = ""
+    n = split($0, f, "\n")
+    for (i = 1; i <= n; i++) {
+      if (f[i] ~ /^Package: /) name = substr(f[i], 10)
+      if (f[i] ~ /^Architecture: /) arch = substr(f[i], 15)
+    }
+    if ((name " " arch) in want) print }
+' Arkbuild/var/lib/dpkg/status > "$WORK/pkgmeta/status"
+cp "$WORK/pkgkeys" "$WORK/pkgmeta/keys"
+sudo awk -F: '$3 < 1000' Arkbuild/etc/group > "$WORK/pkgmeta/group"
+sudo awk -F: '$3 < 1000' Arkbuild/etc/passwd > "$WORK/pkgmeta/passwd"
+FOREIGN_ARCHES="$(sudo chroot Arkbuild dpkg --print-foreign-architectures | tr '\n' ' ' | sed 's/ $//')"
+echo "Packages: $(wc -l < "$WORK/pkgkeys") new since the baseline, $(wc -l < "$WORK/pkgfiles") paths"
+sort -u "$WORK/pkgfiles" | sudo tar -C Arkbuild --numeric-owner --no-recursion -T - -cf "$WORK/packages.tar"
+sudo tar -C "$WORK" --numeric-owner -rf "$WORK/packages.tar" pkgmeta
+gzip -9 "$WORK/packages.tar"
+
 # --- boot partition ----------------------------------------------------------
 # finishing_touches unmounted p3; remount it read-only to read the boot files.
 # firstboot.sh, expandtoexfat.sh and fstab.exfat are first-boot only and
@@ -148,6 +191,8 @@ build=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
 kernel=${KVER}
 boot_sha256=$(sha256sum "$WORK/boot.tar.gz" | cut -d' ' -f1)
 rootfs_sha256=$(sha256sum "$WORK/rootfs.tar.gz" | cut -d' ' -f1)
+packages_sha256=$(sha256sum "$WORK/packages.tar.gz" | cut -d' ' -f1)
+foreign_arches=${FOREIGN_ARCHES}
 resource_sha256=$(gzip -dc "$WORK/resource.img.gz" | sha256sum | cut -d' ' -f1)
 EOF
 cp scripts/spruce/dmupd-apply.sh "$WORK/apply.sh"
@@ -157,7 +202,7 @@ sudo chown -R "$(id -u):$(id -g)" "$WORK"
 rm -f "$DMUPD"
 # Uncompressed outer tar, manifest first, so the head can be read without
 # touching the rest.
-tar -C "$WORK" --owner=0 --group=0 -cf "$DMUPD" manifest apply.sh remove.list boot.tar.gz rootfs.tar.gz resource.img.gz
+tar -C "$WORK" --owner=0 --group=0 -cf "$DMUPD" manifest apply.sh remove.list boot.tar.gz rootfs.tar.gz packages.tar.gz resource.img.gz
 
 echo "Update payload: $DMUPD ($(du -h "$DMUPD" | cut -f1))"
 cat "$WORK/manifest"
