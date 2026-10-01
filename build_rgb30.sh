@@ -50,6 +50,9 @@ source ./build_deps.sh
 # explicit ES profile. Ports link SDL2 themselves and cannot be patched one by
 # one, so the fix has to be the library.
 source ./build_sdl2.sh
+if [[ "${BUILD_ARMHF}" == "y" ]]; then
+  source ./build_arm32_libs.sh
+fi
 #source ./build_ppssppsa.sh
 #source ./build_ppsspp-2021sa.sh
 #source ./build_duckstationsa.sh
@@ -96,9 +99,9 @@ source ./build_drmtool.sh
 #source ./build_controllertester.sh
 #source ./build_batteryplus.sh
 #source ./build_drastic.sh
-#if [[ "${BUILD_BLUEALSA}" == "y" ]]; then
-#  source ./build_bluealsa.sh
-#fi
+if [[ "${BUILD_BLUEALSA}" == "y" ]]; then
+  source ./build_bluealsa.sh
+fi
 #if [[ "${BUILD_KODI}" == "y" ]]; then
 #  source ./build_kodi.sh
 #fi

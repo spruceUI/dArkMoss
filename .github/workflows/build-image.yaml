@@ -150,9 +150,7 @@ jobs:
           # debootstrap reads the mirror URL as its target ("can't cd to
           # http://deb.debian.org"), producing an empty rootfs.
           # ENABLE_CACHE=n: apt-cacher-ng buys nothing on a one-shot runner.
-          # BUILD_ARMHF=n / BUILD_BLUEALSA=n: spruce brings its own userland, so
-          # skip the 32-bit multiarch and bluetooth-audio setup.
-          make ${{ inputs.unit }} ENABLE_CACHE=n BUILD_ARMHF=n BUILD_BLUEALSA=n
+          make ${{ inputs.unit }} ENABLE_CACHE=n
 
       - name: Show what was produced
         if: always()

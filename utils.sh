@@ -95,7 +95,9 @@ function setup_arkbuild32() {
     # Bootstrap base system
     sudo debootstrap --no-check-gpg --include=eatmydata --resolve-deps --arch=armhf --foreign ${DEBIAN_CODE_NAME} Arkbuild32 http://deb.debian.org/debian/
     sudo cp /usr/bin/qemu-arm-static Arkbuild32/usr/bin/
-    echo 'Acquire::http::proxy "http://127.0.0.1:3142";' | sudo tee Arkbuild32/etc/apt/apt.conf.d/99proxy
+    if [[ "${ENABLE_CACHE}" == "y" ]]; then
+      echo 'Acquire::http::proxy "http://127.0.0.1:3142";' | sudo tee Arkbuild32/etc/apt/apt.conf.d/99proxy
+    fi
     sudo chroot Arkbuild32/ apt -y update
     sudo chroot Arkbuild32/ apt -y install eatmydata
     sudo chroot Arkbuild32/ eatmydata /debootstrap/debootstrap --second-stage
