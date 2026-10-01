@@ -28,6 +28,7 @@ fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
     "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" "${RGB30_TF2:-}" \
     "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png" \
+    scripts/kernel/*.patch \
     "fmt2")"
 KERNEL_CACHE_ASSET="kernel-${UNIT}-${KERNEL_CACHE_KEY}.tar.zst"
 KERNEL_FROM_CACHE=n
@@ -105,6 +106,13 @@ if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RGB30_TF2" ]; then
   done
 fi
 if [ "$KERNEL_FROM_CACHE" != "y" ]; then
+  for patch in ../scripts/kernel/*.patch; do
+    git apply -R --check "$patch" 2>/dev/null && continue
+    if ! git apply "$patch"; then
+      echo "ERROR: $patch did not apply."
+      exit 1
+    fi
+  done
   make ARCH=arm64 rk3566_optimized_linux_defconfig
   CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 KERNEL_DTS=rk3566 KERNEL_CONFIG=rk3566_optimized_linux_defconfig
   verify_action

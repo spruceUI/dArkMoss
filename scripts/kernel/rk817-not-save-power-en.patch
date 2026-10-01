@@ -1,0 +1,17 @@
+diff --git a/drivers/mfd/rk808.c b/drivers/mfd/rk808.c
+index 415da2a..965691a 100644
+--- a/drivers/mfd/rk808.c
++++ b/drivers/mfd/rk808.c
+@@ -1005,8 +1005,10 @@ static int rk817_reboot_notifier_handler(struct notifier_block *nb,
+ 	data = container_of(nb, struct rk817_reboot_data_t, reboot_notifier);
+ 	dev = &data->rk808->i2c->dev;
+ 
+-	regmap_read(data->rk808->regmap, RK817_POWER_EN_SAVE0,
+-		    &power_en_active0);
++	power_en_active0 = 0;
++	if (!of_property_read_bool(dev->of_node, "not-save-power-en"))
++		regmap_read(data->rk808->regmap, RK817_POWER_EN_SAVE0,
++			    &power_en_active0);
+ 	if (power_en_active0 != 0) {
+ 		regmap_read(data->rk808->regmap, RK817_POWER_EN_SAVE1,
+ 			    &power_en_active1);
