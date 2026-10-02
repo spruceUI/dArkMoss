@@ -31,6 +31,7 @@ source ./prepare.sh
 # Step-by-step build process
 source ./setup_partition-rk3566.sh
 source ./bootstrap_rootfs-rk3566.sh
+source ./verify_armhf.sh base
 source ./build_kernel-rk3566.sh
 source ./build_deps.sh
 
@@ -109,6 +110,7 @@ fi
 source ./finishing_touches-rk3566.sh
 source ./setup_spruce_handoff-rk3566.sh
 source ./cleanup_filesystem.sh
+source ./verify_armhf.sh full
 source ./build_update-rk3566.sh
 source ./write_rootfs-rk3566.sh
 source ./clean_mounts.sh

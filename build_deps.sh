@@ -26,6 +26,7 @@ fi
 # The live bind mounts (/dev, /proc, /sys, the ccache bind) are excluded too -
 # tarring into those is the classic way to fill a disk with the host's own /dev.
 DEPS_CACHE_KEY="$(bc_key needed_packages.txt needed_dev_packages.txt build_deps.sh \
+    bootstrap_rootfs-${CHIPSET}.sh \
     "${DEBIAN_CODE_NAME}" "${CHIPSET}" "${BUILD_ARMHF}" "${BIT}")"
 DEPS_CACHE_ASSET="chroot-deps-${CHIPSET}-${BIT}-${DEPS_CACHE_KEY}.tar.zst"
 DEPS_FROM_CACHE=n

@@ -113,6 +113,8 @@ function setup_arkbuild32() {
     sudo chroot Arkbuild32/ apt install -y libdrm-dev libgbm1
     setup_ark_user 32
     sudo mkdir -p Arkbuild32/home/ark
+    # The copies below read this as the build user, which is not ark.
+    sudo chmod 755 Arkbuild32/home/ark
     #sudo chroot Arkbuild32/ umount /proc
     source build_deps.sh 32
     source build_sdl2.sh 32
