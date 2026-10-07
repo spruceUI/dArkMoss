@@ -67,28 +67,30 @@ Units:
 
 Images are built on GitHub Actions, not locally. Under Actions:
 
-- **build-rgb30** / **build-miniloong** build one unit.
-- **build-all** builds every unit in parallel and publishes them to one release.
+- **build-all** takes a version (`v1.2.3`) and optionally a list of units
+  (blank = every unit in `.github/units.txt`), builds them in parallel and
+  publishes them as the `beta-<branch>` prerelease. A beta never becomes the
+  latest release, so spruce devices and the installer do not see it.
+- **create-latest-release** turns a beta into a draft release tagged with its
+  version. It refuses a beta that is missing any unit. Publish the draft by
+  hand from the Releases page.
 
-Each takes an optional release tag. Left blank, the image is only kept as a
-workflow artifact. Images ship as `dArkMoss_<UNIT>_<suite>_<date>.img.7z.001`
+Images ship as `dArkMoss_<UNIT>_<suite>_<date>.img.7z.001`
 and `.002` because a single volume is over GitHub's asset limit; the parts are
 a plain byte split, so `cat` them (or let 7z read `.001`) to extract.
 
-Beside each image the build also produces `dArkMoss_<UNIT>_<tag>.dmupd`, an
+Beside each image the build also produces `dArkMoss_<UNIT>_<version>.dmupd`, an
 update payload spruce's Firmware Update app downloads and applies in place: the
 boot partition files, every rootfs file the dArkMoss build added or changed
 (chosen by the dpkg database, see `build_update-rk3566.sh`) and the U-Boot
 resource partition (dtb, charging animation, power-on logo), with the applier
 `scripts/spruce/dmupd-apply.sh` inside. A release carries a `SHA256SUMS` over
-all of its assets, which the app checks the download against. Untagged builds
-stamp the build date as the version, which the app treats as "unknown", so
-only tagged releases are offered as updates.
+all of its assets, which the app checks the download against. The app only
+reads the latest release, so betas are never offered as updates.
 
 Adding a unit that dArkOS already supports: copy `build_rgb30.sh` to
 `build_<unit>.sh` and change `UNIT`, add `logos/unrotated/dArkMoss<unit>.png`
 (the kernel boot logo), give it a name in the `HW_DEVICE` case in
-`setup_spruce_handoff-rk3566.sh`, add a dispatcher workflow next to
-`build-rgb30.yaml` and put the unit in `build-all.yaml`'s matrix. Everything
+`setup_spruce_handoff-rk3566.sh` and add the unit to `.github/units.txt`. Everything
 else in the pipeline already keys on `UNIT`.
 

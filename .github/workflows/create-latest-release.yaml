@@ -1,0 +1,90 @@
+# Turns a beta into a draft versioned release, in place: the beta release is
+# renamed to its version tag, so no images are copied. Publish the draft by
+# hand; that is when spruce devices and the installer see it.
+
+name: create-latest-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_tag:
+        description: "Beta release to promote"
+        required: true
+        default: "beta-spruce"
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the beta
+        id: beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_TAG: ${{ inputs.source_tag }}
+        run: |
+          set -e
+          gh release view "$SOURCE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json body,targetCommitish,isPrerelease,assets > beta.json
+          [ "$(jq -r .isPrerelease beta.json)" = true ] || { echo "::error::$SOURCE_TAG is not a prerelease"; exit 1; }
+
+          VERSION="$(jq -r .body beta.json | sed -n 's/^Version: //p' | tr -d '\r')"
+          SHA="$(jq -r .targetCommitish beta.json)"
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::no version in the $SOURCE_TAG notes"; exit 1; }
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::$SOURCE_TAG has no commit"; exit 1; }
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::$VERSION is already released"; exit 1
+          fi
+
+          jq -r '.assets[].name' beta.json | sort > assets.txt
+          cat assets.txt
+          # Every unit, not just the ones this beta built: a release without a
+          # unit's .dmupd leaves that device's Firmware Update with nothing to get.
+          while read -r unit; do
+            [ -n "$unit" ] || continue
+            U="$(tr '[:lower:]' '[:upper:]' <<<"$unit")"
+            grep -qx "dArkMoss_${U}_${VERSION}.dmupd" assets.txt || { echo "::error::no $unit .dmupd for $VERSION"; exit 1; }
+            grep -qi "${unit}_.*\.img\.7z" assets.txt || { echo "::error::no $unit image"; exit 1; }
+          done < .github/units.txt
+
+          gh release download "$SOURCE_TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS
+          awk '{ print $2 }' SHA256SUMS | sed 's/^\*//' | sort > summed.txt
+          grep -vx SHA256SUMS assets.txt | diff - summed.txt || { echo "::error::SHA256SUMS does not match the assets"; exit 1; }
+
+          HEAD="$(git rev-parse HEAD)"
+          [ "$SHA" = "$HEAD" ] || echo "::warning::$SOURCE_TAG was built from ${SHA:0:7}, ${GITHUB_REF_NAME} is now at ${HEAD:0:7}"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Rename it to a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_TAG: ${{ inputs.source_tag }}
+          VERSION: ${{ steps.beta.outputs.version }}
+          SHA: ${{ steps.beta.outputs.sha }}
+        run: |
+          set -e
+          cat > notes.md <<EOF
+          dArkMoss ${VERSION}
+
+          Built from ${SHA}.
+          EOF
+          gh release edit "$SOURCE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --tag "$VERSION" \
+            --target "$SHA" \
+            --title "$VERSION" \
+            --notes-file notes.md \
+            --prerelease=false \
+            --draft
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$SOURCE_TAG" 2>/dev/null || true
+          {
+            echo "Drafted $VERSION from $SOURCE_TAG. Edit the notes and publish it from the Releases page."
+            gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease,assets \
+              --jq '"tag=\(.tagName) draft=\(.isDraft) prerelease=\(.isPrerelease) assets=\(.assets|length)"' \
+              || echo "(could not read the draft back; check the Releases page)"
+          } >> "$GITHUB_STEP_SUMMARY"

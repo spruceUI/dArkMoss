@@ -1,8 +1,7 @@
 # Build one dArkMoss image (Rockchip RK3566) on a GitHub-hosted runner.
 #
-# Reusable workflow: build-rgb30.yaml, build-miniloong.yaml and build-all.yaml
-# are thin dispatchers that call this with a `unit`. The unit is the Makefile
-# target / build_<unit>.sh name and is what the whole dArkOS pipeline keys on
+# Reusable workflow: build-all.yaml calls it once per `unit`. The unit is the
+# Makefile target / build_<unit>.sh name and is what the whole dArkOS pipeline keys on
 # (UNIT, UNIT_DTB, logos/unrotated/dArkMoss<unit>.png, the kernel cache asset).
 #
 # dArkOS builds a Debian rootfs with debootstrap and only compiles the kernel
@@ -26,13 +25,8 @@ on:
         description: "Makefile target / build_<unit>.sh name (rgb30, miniloong)"
         required: true
         type: string
-      release_tag:
-        description: "Release tag (blank = no release, artifact only)"
-        required: false
-        type: string
-        default: ""
       version:
-        description: "Version to stamp without publishing; build-all passes its tag here and publishes once itself"
+        description: "Version stamped into os-release and the .dmupd name"
         required: false
         type: string
         default: ""
@@ -41,10 +35,10 @@ jobs:
   build:
     name: build-${{ inputs.unit }}
     runs-on: ubuntu-24.04
-    # Needed to publish the image release, and by scripts/ci/build-cache.sh to
-    # read and write the "build-cache" release's assets. Stated explicitly
-    # rather than inherited from the repo default, so tightening that default
-    # later does not quietly turn the cache into a permanent miss.
+    # Needed by scripts/ci/build-cache.sh to read and write the "build-cache"
+    # release's assets. Stated explicitly rather than inherited from the repo
+    # default, so tightening that default later does not quietly turn the cache
+    # into a permanent miss.
     permissions:
       contents: write
     # GitHub's own hard cap for a hosted-runner job is 6h; do not impose an
@@ -140,7 +134,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           # Stamped into os-release as OS_VERSION and into the payload name;
           # empty falls back to the build date.
-          DARKMOSS_VERSION: ${{ inputs.version || inputs.release_tag }}
+          DARKMOSS_VERSION: ${{ inputs.version }}
         run: |
           chmod +x ./*.sh
           chmod +x ./scripts/ci/*.sh
@@ -213,15 +207,3 @@ jobs:
             *.img.7z*
             *.dmupd
           if-no-files-found: warn
-
-      # SHA256SUMS here covers this unit only. A release with every unit comes
-      # from build-all.yaml, whose publish job writes one over all of them.
-      - name: Publish release
-        if: success() && inputs.release_tag != ''
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ inputs.release_tag }}
-          files: |
-            *.img.7z*
-            *.dmupd
-            SHA256SUMS

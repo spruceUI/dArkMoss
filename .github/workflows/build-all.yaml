@@ -1,18 +1,16 @@
-# Build every dArkMoss unit and publish them to one release.
-#
-# Each unit is a leg of the matrix, running build-image.yaml in parallel on its
-# own runner. The legs build artifacts only; publishing is a separate job so the
-# release is written once, with every image that built, instead of two jobs
-# racing to create the same tag. A unit that fails does not hold the others
-# back - whatever produced an image is released.
+# Builds the units in parallel and publishes them as the beta-<branch>
+# prerelease. Promote a beta with create-latest-release.yaml.
 
 name: build-all
 
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: "Release tag (blank = no release, artifacts only)"
+      version:
+        description: "Version stamped into the images, e.g. v1.1.3"
+        required: true
+      units:
+        description: "Comma-separated units (blank = every unit in .github/units.txt)"
         required: false
         default: ""
 
@@ -20,26 +18,53 @@ permissions:
   contents: write
 
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      units: ${{ steps.units.outputs.units }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::version must look like v1.2.3"; exit 1; }
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::$VERSION is already released"; exit 1
+          fi
+
+      - name: Pick the units
+        id: units
+        env:
+          UNITS: ${{ inputs.units }}
+        run: |
+          if [ -z "$UNITS" ]; then
+            UNITS="$(grep -v '^\s*$' .github/units.txt | paste -sd,)"
+          fi
+          json="$(jq -Rc 'split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))' <<<"$UNITS")"
+          for u in $(jq -r '.[]' <<<"$json"); do
+            grep -qx "$u" .github/units.txt || { echo "::error::$u is not in .github/units.txt"; exit 1; }
+          done
+          echo "units=$json" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: plan
     strategy:
       fail-fast: false
       matrix:
-        unit: [rgb30, miniloong]
+        unit: ${{ fromJSON(needs.plan.outputs.units) }}
     uses: ./.github/workflows/build-image.yaml
     with:
       unit: ${{ matrix.unit }}
-      # version, not release_tag: the legs stamp it but must not publish, or
-      # they race each other and the publish job for the same tag.
-      version: ${{ inputs.release_tag }}
+      version: ${{ inputs.version }}
 
   publish:
-    needs: build
-    # Run when the matrix finished, however it finished - only a cancel skips
-    # this. A failed leg simply has no artifact to download.
-    if: ${{ !cancelled() && inputs.release_tag != '' }}
+    needs: [plan, build]
+    # A failed unit just has no artifact; the beta gets whatever built.
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
     steps:
       - name: Collect the images
         uses: actions/download-artifact@v4
@@ -47,24 +72,34 @@ jobs:
           pattern: dArkMoss-*
           merge-multiple: true
 
-      - name: Show what will be released
+      - name: Checksums
         run: |
           shopt -s nullglob
           imgs=( *.img.7z* )
-          if [ ${#imgs[@]} -eq 0 ]; then
-            echo "::error::no unit produced an image, nothing to release"
-            exit 1
-          fi
-          # spruce's Firmware Update app checks the .dmupd it downloads against
-          # this file, so it has to cover every unit in the release.
+          [ ${#imgs[@]} -gt 0 ] || { echo "::error::no unit produced an image"; exit 1; }
           sha256sum *.img.7z* *.dmupd > SHA256SUMS
           ls -lh *.img.7z* *.dmupd SHA256SUMS
 
-      - name: Publish release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ inputs.release_tag }}
-          files: |
-            *.img.7z*
-            *.dmupd
-            SHA256SUMS
+      - name: Publish the beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: beta-${{ github.ref_name }}
+          VERSION: ${{ inputs.version }}
+          UNITS: ${{ needs.plan.outputs.units }}
+        run: |
+          # Asset names carry the date and version, so start from an empty release.
+          gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes 2>/dev/null || true
+          cat > notes.md <<EOF
+          Beta build from \`${GITHUB_REF_NAME}\`. Not for general use.
+
+          Version: ${VERSION}
+          Commit: ${GITHUB_SHA}
+          Units: $(jq -r 'join(" ")' <<<"$UNITS")
+          EOF
+          gh release create "$TAG" *.img.7z* *.dmupd SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Beta Build (${GITHUB_REF_NAME}) ${VERSION}" \
+            --notes-file notes.md \
+            --prerelease \
+            --latest=false
