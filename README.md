@@ -64,6 +64,8 @@ Units:
 |---|---|---|---|
 | rgb30 | Powkiddy RGB30 | `make rgb30` | `build_rgb30.sh` |
 | miniloong | Miniloong Pocket 1 | `make miniloong` | `build_miniloong.sh` |
+| a10mini | A10 Mini (RK3326) | `make a10mini` | `build_a10mini.sh` |
+| g350 | G350 (RK3326) | `make g350` | `build_g350.sh` |
 
 Images are built on GitHub Actions, not locally. Under Actions:
 
@@ -82,15 +84,17 @@ a plain byte split, so `cat` them (or let 7z read `.001`) to extract.
 Beside each image the build also produces `dArkMoss_<UNIT>_<version>.dmupd`, an
 update payload spruce's Firmware Update app downloads and applies in place: the
 boot partition files, every rootfs file the dArkMoss build added or changed
-(chosen by the dpkg database, see `build_update-rk3566.sh`) and the U-Boot
+(chosen by the dpkg database, see `build_update.sh`) and the U-Boot
 resource partition (dtb, charging animation, power-on logo), with the applier
 `scripts/spruce/dmupd-apply.sh` inside. A release carries a `SHA256SUMS` over
 all of its assets, which the app checks the download against. The app only
 reads the latest release, so betas are never offered as updates.
 
-Adding a unit that dArkOS already supports: copy `build_rgb30.sh` to
-`build_<unit>.sh` and change `UNIT`, add `logos/unrotated/dArkMoss<unit>.png`
-(the kernel boot logo), give it a name in the `HW_DEVICE` case in
-`setup_spruce_handoff-rk3566.sh` and add the unit to `.github/units.txt`. Everything
-else in the pipeline already keys on `UNIT`.
+Adding a unit that dArkOS already supports: copy `build_rgb30.sh` (rk3566) or
+`build_g350.sh` (rk3326) to `build_<unit>.sh` and change `UNIT`. On rk3566 add
+`logos/unrotated/dArkMoss<unit>.png` (the kernel boot logo); rk3326 units share
+`logos/unrotated/dArkMoss.bmp` (the U-Boot logo on the boot partition). Give it
+a name in the `HW_DEVICE` and `SPRUCE_PLATFORM` cases in
+`setup_spruce_handoff.sh` and in `build_update.sh`, and add the unit to
+`.github/units.txt`. Everything else in the pipeline already keys on `UNIT`.
 

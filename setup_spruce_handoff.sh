@@ -2,9 +2,9 @@
 # dArkMoss: hand the boot off to spruce on TF2 instead of EmulationStation.
 #
 # spruce is the whole frontend and brings its own emulators from TF2, so the ES
-# build is stripped out of build_rgb30.sh. This installs a systemd service that,
-# once the base system is up, mounts the spruce card (TF2) at /mnt/SDCARD and
-# execs spruce's own runtime.sh.
+# build is stripped out of every build_<unit>.sh. This installs a systemd
+# service that, once the base system is up, mounts the spruce card (TF2) at
+# /mnt/SDCARD and execs spruce's own runtime.sh.
 
 echo -e "Wiring the spruce hand-off...\n\n"
 
@@ -122,13 +122,14 @@ sudo cp scripts/spruce/darkmoss-debug.service Arkbuild/etc/systemd/system/darkmo
 sudo chroot Arkbuild/ bash -c "systemctl enable darkmoss-debug.service"
 
 # The user-facing README for this lives on the FAT partition and is written in
-# finishing_touches-rk3566.sh, which is the last place p3 is still mounted.
+# finishing_touches(-rk3566).sh, the last place the boot partition is mounted.
 # --- end logging -----------------------------------------------------------
 
-# Stamp an identifier spruce's platform detection keys off. Every rk3566 unit
-# here shares its cpuinfo signature (0xd05) with the Miyoo Flip, so spruce reads
-# os-release to tell them apart. spruce's helperFunctions.sh must match DARKMOSS
-# in its 0xd05 case; HW_DEVICE below says which dArkMoss unit it is.
+# Stamp an identifier spruce's platform detection keys off. The rk3566 units
+# share their cpuinfo signature (0xd05) with the Miyoo Flip and the rk3326 ones
+# theirs (0xd04) with the GKD Pixel 2, so spruce reads os-release to tell them
+# apart. spruce's helperFunctions.sh must match DARKMOSS in both cases;
+# SPRUCE_PLATFORM below says which dArkMoss unit it is.
 if ! grep -q '^OS_NAME=' Arkbuild/etc/os-release 2>/dev/null; then
   echo 'OS_NAME="DARKMOSS"' | sudo tee -a Arkbuild/etc/os-release >/dev/null
 fi
@@ -151,6 +152,8 @@ fi
 case "$UNIT" in
   rgb30)     HW_DEVICE_NAME="Powkiddy RGB30" ;;
   miniloong) HW_DEVICE_NAME="Miniloong Pocket 1" ;;
+  a10mini)   HW_DEVICE_NAME="A10 Mini" ;;
+  g350)      HW_DEVICE_NAME="G350" ;;
   *)         HW_DEVICE_NAME="" ;;
 esac
 if [ -n "$HW_DEVICE_NAME" ] && ! grep -q '^HW_DEVICE=' Arkbuild/etc/os-release 2>/dev/null; then
@@ -163,6 +166,8 @@ fi
 case "$UNIT" in
   rgb30)     SPRUCE_PLATFORM_NAME="RGB30" ;;
   miniloong) SPRUCE_PLATFORM_NAME="Miniloong" ;;
+  a10mini)   SPRUCE_PLATFORM_NAME="A10Mini" ;;
+  g350)      SPRUCE_PLATFORM_NAME="G350" ;;
   *)         SPRUCE_PLATFORM_NAME="" ;;
 esac
 if [ -n "$SPRUCE_PLATFORM_NAME" ] && ! grep -q '^SPRUCE_PLATFORM=' Arkbuild/etc/os-release 2>/dev/null; then

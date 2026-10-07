@@ -1,8 +1,9 @@
-# Build one dArkMoss image (Rockchip RK3566) on a GitHub-hosted runner.
+# Build one dArkMoss image (Rockchip RK3566 or RK3326) on a GitHub-hosted
+# runner.
 #
 # Reusable workflow: build-all.yaml calls it once per `unit`. The unit is the
-# Makefile target / build_<unit>.sh name and is what the whole dArkOS pipeline keys on
-# (UNIT, UNIT_DTB, logos/unrotated/dArkMoss<unit>.png, the kernel cache asset).
+# Makefile target / build_<unit>.sh name and is what the whole dArkOS pipeline
+# keys on (UNIT, UNIT_DTB, the boot logo, the kernel cache asset).
 #
 # dArkOS builds a Debian rootfs with debootstrap and only compiles the kernel
 # and (upstream) a pile of emulators from source. dArkMoss strips the emulators
@@ -22,7 +23,7 @@ on:
   workflow_call:
     inputs:
       unit:
-        description: "Makefile target / build_<unit>.sh name (rgb30, miniloong)"
+        description: "Makefile target / build_<unit>.sh name (see .github/units.txt)"
         required: true
         type: string
       version:
@@ -76,9 +77,9 @@ jobs:
           # recent. Correctness is the build's own .commit check, not the key.
           # The unit suffix only keeps build-all's parallel legs from colliding
           # on one run_id; the rootfs itself is the same for every unit.
-          key: darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-${{ github.run_id }}-${{ inputs.unit }}
+          key: darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs.sh', 'bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-${{ github.run_id }}-${{ inputs.unit }}
           restore-keys: |
-            darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-
+            darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs.sh', 'bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-
             darkmoss-rootfs-
 
       - name: Restore the aarch64 toolchain cache
@@ -172,7 +173,7 @@ jobs:
           fi
           upd=( *.dmupd )
           if [ ${#upd[@]} -eq 0 ]; then
-            echo "::error::no *.dmupd produced - build_update-rk3566.sh did not run or failed"
+            echo "::error::no *.dmupd produced - build_update.sh did not run or failed"
             exit 1
           fi
           echo "image(s) produced:"; ls -lh *.img.7z* *.dmupd
@@ -189,7 +190,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: Arkbuild_package_cache
-          key: darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-${{ github.run_id }}-${{ inputs.unit }}
+          key: darkmoss-rootfs-${{ hashFiles('bootstrap_rootfs.sh', 'bootstrap_rootfs-rk3566.sh', 'needed_packages.txt', 'needed_dev_packages.txt') }}-${{ github.run_id }}-${{ inputs.unit }}
 
       - name: Save the aarch64 toolchain cache
         if: ${{ always() && steps.toolchain-cache.outputs.cache-hit != 'true' }}

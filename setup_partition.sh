@@ -26,18 +26,17 @@ elif [[ "$ROOT_FILESYSTEM_FORMAT" == *"ext"* ]]; then
 fi
 SYSTEM_SIZE=100      # FAT32 boot partition size in MB
 STORAGE_SIZE=7500    # Root filesystem size in MB
-ROM_PART_SIZE=300    # FAT32 ROMS/shared partition size in MB
 BUILD_SIZE=52000     # Initial file system size in MB during the build.  Then will be reduced to the DISK_SIZE or below upon completion
 
 SYSTEM_PART_START=32768
 SYSTEM_PART_END=$(( SYSTEM_PART_START + (SYSTEM_SIZE * 1024 * 1024 / 512) - 1 ))
 STORAGE_PART_START=$(( SYSTEM_PART_END + 1 ))
 STORAGE_PART_END=$(( STORAGE_PART_START + (STORAGE_SIZE * 1024 * 1024 / 512) - 1 ))
-ROM_PART_START=$(( STORAGE_PART_END + 1 ))
-ROM_PART_END=$(( ROM_PART_START + (ROM_PART_SIZE * 1024 * 1024 / 512) - 1 ))
 
 DISK_START_PADDING=$(( (SYSTEM_PART_START + 2048 - 1) / 2048 ))
-DISK_SIZE=$(( DISK_START_PADDING + SYSTEM_SIZE + STORAGE_SIZE + ROM_PART_SIZE + 1 ))
+# No ROMS partition: spruce lives on TF2, and firstboot grows the rootfs into
+# the rest of TF1.
+DISK_SIZE=$(( DISK_START_PADDING + SYSTEM_SIZE + STORAGE_SIZE + 1 ))
 FILESYSTEM="ArkOS_File_System.img"
 
 # Create filesystem image

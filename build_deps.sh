@@ -25,8 +25,13 @@ fi
 # cache entry, and overlapping the two would make each depend on the other's key.
 # The live bind mounts (/dev, /proc, /sys, the ccache bind) are excluded too -
 # tarring into those is the classic way to fill a disk with the host's own /dev.
+
+# rk3326 bootstraps with the unsuffixed script. A path bc_key cannot find is
+# hashed as its name, so the wrong one would never invalidate the cache.
+BOOTSTRAP_SCRIPT=bootstrap_rootfs-${CHIPSET}.sh
+[ -f "$BOOTSTRAP_SCRIPT" ] || BOOTSTRAP_SCRIPT=bootstrap_rootfs.sh
 DEPS_CACHE_KEY="$(bc_key needed_packages.txt needed_dev_packages.txt build_deps.sh \
-    bootstrap_rootfs-${CHIPSET}.sh \
+    "$BOOTSTRAP_SCRIPT" \
     "${DEBIAN_CODE_NAME}" "${CHIPSET}" "${BUILD_ARMHF}" "${BIT}")"
 DEPS_CACHE_ASSET="chroot-deps-${CHIPSET}-${BIT}-${DEPS_CACHE_KEY}.tar.zst"
 DEPS_FROM_CACHE=n

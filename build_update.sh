@@ -11,7 +11,8 @@
 # deleted go into remove.list.
 #
 # Runs after cleanup_filesystem.sh, while Arkbuild is still mounted and the
-# image's boot partition can be remounted from ${LOOP_DEV}p3.
+# image's boot partition can be remounted: ${LOOP_DEV}p3 on rk3566, the first
+# MBR partition of ${DISK} on rk3326.
 
 echo -e "Packing the update payload...\n\n"
 
@@ -23,6 +24,8 @@ WORK="$(mktemp -d)"
 case "$UNIT" in
   rgb30)     DMUPD_PLATFORM="RGB30" ;;
   miniloong) DMUPD_PLATFORM="Miniloong" ;;
+  a10mini)   DMUPD_PLATFORM="A10Mini" ;;
+  g350)      DMUPD_PLATFORM="G350" ;;
   *)         DMUPD_PLATFORM="" ;;
 esac
 
@@ -164,21 +167,33 @@ sudo tar -C "$WORK" --numeric-owner -rf "$WORK/packages.tar" pkgmeta
 gzip -9 "$WORK/packages.tar"
 
 # --- boot partition ----------------------------------------------------------
-# finishing_touches unmounted p3; remount it read-only to read the boot files.
+# finishing_touches unmounted it; remount it read-only to read the boot files.
 # firstboot.sh, expandtoexfat.sh and fstab.exfat are first-boot only and
 # already deleted on any device this could land on.
 mkdir -p ${mountpoint}
-sudo mount -o ro ${LOOP_DEV}p3 ${mountpoint}
+if [ "$CHIPSET" = "rk3326" ]; then
+  BOOT_LOOP=$(sudo losetup --find --show --read-only --offset $((SYSTEM_PART_START * 512)) \
+    --sizelimit $(( (SYSTEM_PART_END - SYSTEM_PART_START + 1) * 512 )) ${DISK})
+  sudo mount -o ro ${BOOT_LOOP} ${mountpoint}
+else
+  sudo mount -o ro ${LOOP_DEV}p3 ${mountpoint}
+fi
 sudo tar -C ${mountpoint} --numeric-owner \
   --exclude=./firstboot.sh --exclude=./expandtoexfat.sh --exclude=./fstab.exfat \
   -czf "$WORK/boot.tar.gz" .
 sudo umount ${mountpoint}
+[ -n "${BOOT_LOOP:-}" ] && sudo losetup -d ${BOOT_LOOP}
 
 # --- resource partition ------------------------------------------------------
 # U-Boot's resource partition (p2): its dtb, the off-charging animation and the
 # power-on logo. Not a filesystem, so it ships as the raw 4MB partition and the
 # applier writes it back whole, exactly as flashing the image would.
-sudo dd if=${LOOP_DEV}p2 bs=1M 2>/dev/null | gzip -c > "$WORK/resource.img.gz"
+# rk3326 has no resource partition; an empty resource_sha256 tells the applier.
+RESOURCE_FILE=""
+if [ "$CHIPSET" != "rk3326" ]; then
+  sudo dd if=${LOOP_DEV}p2 bs=1M 2>/dev/null | gzip -c > "$WORK/resource.img.gz"
+  RESOURCE_FILE=resource.img.gz
+fi
 
 # --- assemble ---------------------------------------------------------------
 KVER=$(basename "$(find Arkbuild/usr/lib/modules -maxdepth 1 -mindepth 1 -type d | head -n 1)")
@@ -193,7 +208,7 @@ boot_sha256=$(sha256sum "$WORK/boot.tar.gz" | cut -d' ' -f1)
 rootfs_sha256=$(sha256sum "$WORK/rootfs.tar.gz" | cut -d' ' -f1)
 packages_sha256=$(sha256sum "$WORK/packages.tar.gz" | cut -d' ' -f1)
 foreign_arches=${FOREIGN_ARCHES}
-resource_sha256=$(gzip -dc "$WORK/resource.img.gz" | sha256sum | cut -d' ' -f1)
+resource_sha256=$([ -n "$RESOURCE_FILE" ] && gzip -dc "$WORK/resource.img.gz" | sha256sum | cut -d' ' -f1)
 EOF
 cp scripts/spruce/dmupd-apply.sh "$WORK/apply.sh"
 chmod 0755 "$WORK/apply.sh"
@@ -202,7 +217,7 @@ sudo chown -R "$(id -u):$(id -g)" "$WORK"
 rm -f "$DMUPD"
 # Uncompressed outer tar, manifest first, so the head can be read without
 # touching the rest.
-tar -C "$WORK" --owner=0 --group=0 -cf "$DMUPD" manifest apply.sh remove.list boot.tar.gz rootfs.tar.gz packages.tar.gz resource.img.gz
+tar -C "$WORK" --owner=0 --group=0 -cf "$DMUPD" manifest apply.sh remove.list boot.tar.gz rootfs.tar.gz packages.tar.gz $RESOURCE_FILE
 
 echo "Update payload: $DMUPD ($(du -h "$DMUPD" | cut -f1))"
 cat "$WORK/manifest"

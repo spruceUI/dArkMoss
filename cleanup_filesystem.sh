@@ -242,7 +242,7 @@ if grep -qs "Arkbuild/home/ark/Arkbuild_ccache" /proc/mounts; then
   sudo umount -l Arkbuild/home/ark/Arkbuild_ccache
 fi
 sudo rm -rf Arkbuild/home/ark/Arkbuild_ccache
-# NOT removing /var/log/journal - see setup_spruce_handoff-rk3566.sh. A
+# NOT removing /var/log/journal - see setup_spruce_handoff.sh. A
 # persistent journal is the difference between debugging this device from a log
 # and debugging it by swapping cards, and it is capped at 64M.
 sudo rm Arkbuild/usr/sbin/policy-rc.d

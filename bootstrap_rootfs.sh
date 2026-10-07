@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo -e "Boostraping Debian....\n\n"
-if [ -f "Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.tar.gz" ] && [ "$(cat Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.commit)" == "$(curl -s https://deb.debian.org/debian/dists/stable/Release | grep "^Version:" | cut -d' ' -f2)" ]; then
+if [ -f "Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.tar.gz" ] && [ "$(cat Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.commit)" == "$(curl -s https://deb.debian.org/debian/dists/stable/Release | grep "^Version:" | cut -d' ' -f2)" ] && [ "$(cat Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.armhf 2>/dev/null)" == "${BUILD_ARMHF}" ]; then
     sudo tar -xvzpf Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.tar.gz
 else
 	if [[ "${ENABLE_CACHE}" == "y" ]]; then
@@ -25,6 +25,7 @@ else
 	  sudo chroot Arkbuild/ eatmydata apt-get -y install libc6:armhf liblzma5:armhf libasound2t64:armhf libfreetype6:armhf libxkbcommon-x11-0:armhf libudev1:armhf libudev0:armhf libgbm1:armhf libstdc++6:armhf
 	fi
 	sudo cat Arkbuild/etc/os-release | grep "^DEBIAN_VERSION_FULL=" | cut -d'=' -f2 > Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.commit
+	echo "${BUILD_ARMHF}" > Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.armhf
 	sudo tar -cvpzf Arkbuild_package_cache/debian_${DEBIAN_CODE_NAME}_rootfs.tar.gz Arkbuild/
 fi
 
@@ -59,9 +60,8 @@ sudo chroot Arkbuild/ eatmydata apt-get install -y libdrm-dev libgbm1
 setup_ark_user
 sleep 10
 echo -e "Generating /etc/fstab"
-echo -e "LABEL=ROOTFS / ${ROOT_FILESYSTEM_FORMAT} ${ROOT_FILESYSTEM_MOUNT_OPTIONS} 0 1
-LABEL=BOOT /boot vfat defaults 0 0
-LABEL=EASYROMS /roms vfat defaults,auto,umask=000,uid=1000,gid=1000,noatime 0 0" | sudo tee Arkbuild/etc/fstab
+echo -e "/dev/mmcblk0p2 / ${ROOT_FILESYSTEM_FORMAT} ${ROOT_FILESYSTEM_MOUNT_OPTIONS} 0 1
+/dev/mmcblk0p1 /boot vfat defaults 0 0" | sudo tee Arkbuild/etc/fstab
 echo -e "Generating 10-standard.rules for udev"
 echo -e "# Rules
 KERNEL==\"mali0\", GROUP=\"video\", MODE=\"0660\"

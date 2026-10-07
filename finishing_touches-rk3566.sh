@@ -118,7 +118,7 @@ EOF
 
 # Logging README, on the FAT partition because that is the only thing on TF1 a
 # user with a card reader and no Linux box can read. The service and the
-# journald config that back this are installed in setup_spruce_handoff-rk3566.sh;
+# journald config that back this are installed in setup_spruce_handoff.sh;
 # this is the last point in the build where p3 is still mounted, so the file has
 # to be written here.
 cat <<EOF | sudo tee ${mountpoint}/README-logging.txt >/dev/null

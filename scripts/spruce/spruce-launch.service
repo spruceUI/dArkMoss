@@ -48,7 +48,7 @@ RestartSec=3
 StandardInput=tty
 # stdin stays on the tty: the frontend still needs the VT for DRM and input.
 # Output goes to the journal - persistent (64M cap, see
-# setup_spruce_handoff-rk3566.sh), and exported to /boot/logs by
+# setup_spruce_handoff.sh), and exported to /boot/logs by
 # darkmoss-debug.sh for reading off the card. The debug flag puts spruce on the
 # panel through the ExecStart redirect above, not here: StandardOutput=console
 # would target this device's serial console (ttyUSB0), not the screen.

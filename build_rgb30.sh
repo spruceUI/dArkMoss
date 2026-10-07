@@ -108,10 +108,10 @@ fi
 #fi
 # --- end dArkMoss strip ---------------------------------------------------
 source ./finishing_touches-rk3566.sh
-source ./setup_spruce_handoff-rk3566.sh
+source ./setup_spruce_handoff.sh
 source ./cleanup_filesystem.sh
 source ./verify_armhf.sh full
-source ./build_update-rk3566.sh
+source ./build_update.sh
 source ./write_rootfs-rk3566.sh
 source ./clean_mounts.sh
 source ./create_image.sh

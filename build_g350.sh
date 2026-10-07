@@ -30,50 +30,23 @@ source ./prepare.sh
 # Step-by-step build process
 source ./setup_partition.sh
 source ./bootstrap_rootfs.sh
+source ./verify_armhf.sh base
 source ./image_setup.sh
 source ./build_kernel.sh
 source ./build_deps.sh
+# dArkMoss: spruce brings the frontend and emulators on TF2, so only the port
+# runtime is built here - see build_rgb30.sh for what upstream builds and why.
 source ./build_sdl2.sh
-source ./build_ppssppsa.sh
-source ./build_ppsspp-2021sa.sh
-source ./build_duckstationsa.sh
-source ./build_mupen64plussa.sh
-source ./build_gzdoom.sh
-source ./build_lzdoom.sh
-source ./build_retroarch.sh
-source ./build_retrorun.sh
-source ./build_yabasanshirosa.sh
-source ./build_mednafen.sh
-source ./build_ecwolfsa.sh
-source ./build_hypseus-singe.sh
-source ./build_openbor.sh
-source ./build_solarus.sh
-source ./build_scummvmsa.sh
-source ./build_fake08.sh
-source ./build_xroar.sh
-source ./build_mvem.sh
-source ./build_bigpemu.sh
-source ./build_ogage.sh
+if [[ "${BUILD_ARMHF}" == "y" ]]; then
+  source ./build_arm32_libs.sh
+fi
 source ./build_ogacontrols.sh
-source ./build_351files.sh
-source ./build_filemanager.sh
-source ./build_filebrowser.sh
 source ./build_gptokeyb.sh
-source ./build_image-viewer.sh
-source ./build_emulationstation.sh
-source ./build_linapple.sh
-source ./build_applewinsa.sh
-source ./build_piemu.sh
-source ./build_ti99sim.sh
-source ./build_gametank.sh
-source ./build_openmsxsa.sh
-source ./build_flycastsa.sh
-source ./build_sdljoytest.sh
-source ./build_controllertester.sh
-source ./build_drastic.sh
-source ./build_amiberrysa.sh
 source ./finishing_touches.sh
+source ./setup_spruce_handoff.sh
 source ./cleanup_filesystem.sh
+source ./verify_armhf.sh full
+source ./build_update.sh
 source ./write_rootfs.sh
 source ./clean_mounts.sh
 source ./create_image.sh
