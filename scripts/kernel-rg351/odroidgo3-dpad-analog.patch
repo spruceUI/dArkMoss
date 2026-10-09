@@ -1,0 +1,144 @@
+--- a/drivers/input/joystick/odroidgo3-joypad.c
++++ b/drivers/input/joystick/odroidgo3-joypad.c
+@@ -117,6 +117,9 @@
+ 	/* report enable/disable */
+ 	bool enable;
+ 
++	/* d-pad reported as the left stick */
++	bool dpad_analog;
++
+ 	/* analog mux & joystick control */
+ 	struct analog_mux *amux;
+ 	/* analog mux max count */
+@@ -415,6 +418,67 @@
+ 		   joypad_store_enable);
+ 
+ /*----------------------------------------------------------------------------*/
++static bool joypad_is_dpad(struct bt_gpio *gpio)
++{
++	return gpio->report_type == EV_KEY &&
++		gpio->linux_code >= BTN_DPAD_UP &&
++		gpio->linux_code <= BTN_DPAD_RIGHT;
++}
++
++/*
++ * ATTRIBUTES:
++ *
++ * /sys/devices/platform/odroidgo3-joypad/dpad_analog [rw]
++ *
++ * 1: the d-pad drives ABS_X/ABS_Y at full deflection and its keys go quiet,
++ * for stickless units. 0: normal.
++ */
++static ssize_t joypad_store_dpad_analog(struct device *dev,
++				      struct device_attribute *attr,
++				      const char *buf,
++				      size_t count)
++{
++	struct platform_device *pdev  = to_platform_device(dev);
++	struct joypad *joypad = platform_get_drvdata(pdev);
++	bool on = simple_strtoul(buf, NULL, 10) != 0;
++	int nbtn;
++
++	mutex_lock(&joypad->lock);
++	if (on != joypad->dpad_analog) {
++		for (nbtn = 0; nbtn < joypad->bt_gpio_count; nbtn++) {
++			struct bt_gpio *gpio = &joypad->gpios[nbtn];
++
++			if (!joypad_is_dpad(gpio))
++				continue;
++			/* release held keys; when off, held keys report again */
++			if (on && gpio->old_value == gpio->active_level)
++				input_event(joypad->input, EV_KEY,
++					gpio->linux_code, 0);
++			gpio->old_value = !gpio->active_level;
++		}
++		input_sync(joypad->input);
++		joypad->dpad_analog = on;
++	}
++	mutex_unlock(&joypad->lock);
++
++	return count;
++}
++
++static ssize_t joypad_show_dpad_analog(struct device *dev,
++				     struct device_attribute *attr,
++				     char *buf)
++{
++	struct platform_device *pdev  = to_platform_device(dev);
++	struct joypad *joypad = platform_get_drvdata(pdev);
++
++	return sprintf(buf, "%d\n", joypad->dpad_analog);
++}
++
++static DEVICE_ATTR(dpad_analog, S_IWUSR | S_IRUGO,
++		   joypad_show_dpad_analog,
++		   joypad_store_dpad_analog);
++
++/*----------------------------------------------------------------------------*/
+ /*
+  * ATTRIBUTES:
+  *
+@@ -665,6 +729,7 @@
+ 	&dev_attr_adc_fuzz.attr,
+ 	&dev_attr_adc_flat.attr,
+ 	&dev_attr_enable.attr,
++	&dev_attr_dpad_analog.attr,
+ 	&dev_attr_adc_cal.attr,
+ 	&dev_attr_amux_debug.attr,
+ 	&dev_attr_rumble_period.attr,
+@@ -687,6 +752,8 @@
+ 	for (nbtn = 0; nbtn < joypad->bt_gpio_count; nbtn++) {
+ 		struct bt_gpio *gpio = &joypad->gpios[nbtn];
+ 
++		if (joypad->dpad_analog && joypad_is_dpad(gpio))
++			continue;
+ 		if (gpio_get_value_cansleep(gpio->num) < 0) {
+ 			dev_err(joypad->dev, "failed to get gpio state\n");
+ 			continue;
+@@ -704,6 +771,32 @@
+ }
+ 
+ /*----------------------------------------------------------------------------*/
++static bool joypad_dpad_pressed(struct joypad *joypad, int code)
++{
++	int nbtn;
++
++	for (nbtn = 0; nbtn < joypad->bt_gpio_count; nbtn++) {
++		struct bt_gpio *gpio = &joypad->gpios[nbtn];
++
++		if (gpio->report_type == EV_KEY && gpio->linux_code == code)
++			return gpio_get_value(gpio->num) == gpio->active_level;
++	}
++	return false;
++}
++
++static int joypad_dpad_axis(struct joypad *joypad, struct bt_adc *adc)
++{
++	bool neg = joypad_dpad_pressed(joypad,
++		adc->report_type == ABS_X ? BTN_DPAD_LEFT : BTN_DPAD_UP);
++	bool pos = joypad_dpad_pressed(joypad,
++		adc->report_type == ABS_X ? BTN_DPAD_RIGHT : BTN_DPAD_DOWN);
++
++	if (neg == pos)
++		return 0;
++	return neg ? adc->min : adc->max;
++}
++
++/*----------------------------------------------------------------------------*/
+ static void joypad_adc_check(struct input_polled_dev *poll_dev)
+ {
+ 	struct joypad *joypad = poll_dev->private;
+@@ -712,6 +805,13 @@
+ 	for (nbtn = 0; nbtn < joypad->amux_count; nbtn++) {
+ 		struct bt_adc *adc = &joypad->adcs[nbtn];
+ 
++		if (joypad->dpad_analog &&
++		    (adc->report_type == ABS_X || adc->report_type == ABS_Y)) {
++			input_report_abs(poll_dev->input, adc->report_type,
++				joypad_dpad_axis(joypad, adc));
++			continue;
++		}
++
+ 		adc->value = joypad_adc_read(joypad->amux, adc);
+ 		if (!adc->value) {
+ 			dev_err(joypad->dev, "%s : saradc channels[%d]!\n",

@@ -22,6 +22,14 @@ if [ ! -d "$KERNEL_SRC" ]; then
   git clone --recursive --depth=1 https://github.com/christianhaitian/linux.git -b $KERNEL_SRC $KERNEL_SRC
 fi
 cd $KERNEL_SRC
+for patch in ../scripts/kernel-${KERNEL_SRC}/*.patch; do
+  [ -e "$patch" ] || continue
+  git apply -R --check "$patch" 2>/dev/null && continue
+  if ! git apply "$patch"; then
+    echo "ERROR: $patch did not apply."
+    exit 1
+  fi
+done
 make ARCH=arm64 ${DEF_CONFIG}
 CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare
 CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs modules
