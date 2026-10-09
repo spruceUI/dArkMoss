@@ -42,6 +42,7 @@ if [[ "${BUILD_ARMHF}" == "y" ]]; then
 fi
 source ./build_ogacontrols.sh
 source ./build_gptokeyb.sh
+source ./build_drmtool.sh
 source ./finishing_touches.sh
 source ./setup_spruce_handoff.sh
 source ./cleanup_filesystem.sh
