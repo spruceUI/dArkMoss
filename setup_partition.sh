@@ -34,8 +34,7 @@ STORAGE_PART_START=$(( SYSTEM_PART_END + 1 ))
 STORAGE_PART_END=$(( STORAGE_PART_START + (STORAGE_SIZE * 1024 * 1024 / 512) - 1 ))
 
 DISK_START_PADDING=$(( (SYSTEM_PART_START + 2048 - 1) / 2048 ))
-# No ROMS partition: spruce lives on TF2, and firstboot grows the rootfs into
-# the rest of TF1.
+# No data partition in the image: firstboot adds SPRUCEOS behind the rootfs.
 DISK_SIZE=$(( DISK_START_PADDING + SYSTEM_SIZE + STORAGE_SIZE + 1 ))
 FILESYSTEM="ArkOS_File_System.img"
 

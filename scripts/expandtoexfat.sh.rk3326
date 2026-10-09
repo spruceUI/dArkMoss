@@ -1,16 +1,10 @@
 #!/bin/bash
-# Firstboot: grow the rootfs into the rest of the card.
+# Firstboot: cap the rootfs at 11GB and give the rest of the card to an exFAT
+# SPRUCEOS partition (p3), so spruce can live on this card too. A card with no
+# room past 11GB gets the rootfs alone.
 #
-# Upstream dArkOS did far more here - deleted the ROMS partition, capped the
-# rootfs at 11GB, recreated ROMS across everything left, mkfs.exfat'd it as
-# EASYROMS, mounted it, untarred an EmulationStation ROM tree and a pile of
-# themes onto it, then rebooted. spruce is the frontend, it lives on TF2, and nothing on this image
-# reads /roms, so all of that is gone along with the partition itself (see
-# setup_partition.sh). TF1 is boot + rootfs, and the rootfs takes the whole
-# card.
-#
-# Kept: the console font/dialog setup, so a user watching the screen still sees
-# what is happening on first boot rather than a blank tty.
+# Upstream dArkOS also untarred an EmulationStation ROM tree and themes onto
+# its EASYROMS partition; spruce is the frontend, so none of that is here.
 sudo chmod 666 /dev/tty1
 export TERM=linux
 sudo setfont /usr/share/consolefonts/Lat7-Terminus20x10.psf.gz
@@ -20,13 +14,23 @@ width="60"
 primary_block=mmcblk0
 partition_type=$(df -T | grep mmcblk0p2 | cut -d ' ' -f 2)
 
+ROOTFS_SECTORS=$((11 * 1024 * 1024 * 2))
+disk_sectors=$(cat /sys/block/${primary_block}/size)
+rootfs_start=$(cat /sys/block/${primary_block}/${primary_block}p2/start)
+data_start=$(( (rootfs_start + ROOTFS_SECTORS + 2047) / 2048 * 2048 ))
+make_data=0
+[ $((data_start + 2048)) -lt "$disk_sectors" ] && make_data=1
+
 exitcode=1
 (
 	echo 10
-	# No --free-percent: the rootfs is the last partition now, so plain
-	# growpart takes it to the end of the card.
-	sudo growpart -v /dev/${primary_block} 2 &> /dev/null
-	echo 40
+	if [ "$make_data" = 1 ]; then
+		echo "size=$ROOTFS_SECTORS" | sudo sfdisk -N 2 --no-reread --force /dev/${primary_block} &> /dev/null
+		sudo partx -u -n 2 /dev/${primary_block} &> /dev/null
+	else
+		sudo growpart -v /dev/${primary_block} 2 &> /dev/null
+	fi
+	echo 30
 	if [[ "$partition_type" == *"ext"* ]]; then
 		sudo resize2fs /dev/${primary_block}p2 &> /dev/null
 		echo $? > /tmp/code.txt
@@ -40,6 +44,15 @@ exitcode=1
 		echo "Don't know how to grow a $partition_type file system."
 		echo 1 > /tmp/code.txt
 	fi
+	echo 50
+	if [ "$make_data" = 1 ]; then
+		# An explicit start: --append alone takes the first gap, which is U-Boot.
+		echo "start=$data_start, type=7" | \
+			sudo sfdisk --append --no-reread --force /dev/${primary_block} &> /dev/null
+		sudo partx -a -n 3 /dev/${primary_block} &> /dev/null
+		sleep 2
+		sudo mkfs.exfat -c 16K -L SPRUCEOS /dev/${primary_block}p3 &> /dev/null || echo 1 > /tmp/code.txt
+	fi
 	echo 80
 	sync
 	sudo cp -f /boot/fstab.exfat /etc/fstab &> /dev/null
@@ -47,7 +60,7 @@ exitcode=1
 	sudo rm -f /boot/fstab.exfat &> /dev/null
 	sync
 	echo 100
-) | dialog --title "Firstboot setup of dArkMoss" --gauge "Expanding the root filesystem.  Please wait..." $height $width 0 2>&1 > /dev/tty1
+) | dialog --title "Firstboot setup of dArkMoss" --gauge "Setting up the card.  Please wait..." $height $width 0 2>&1 > /dev/tty1
 
 exitcode=$(cat /tmp/code.txt)
 systemctl disable firstboot.service &> /dev/null
@@ -55,8 +68,8 @@ sudo rm -f /boot/firstboot.sh &> /dev/null
 sudo rm -- "$0" &> /dev/null
 
 if [ "$exitcode" == "0" ]; then
-  dialog --infobox "Root filesystem expanded. The system will now reboot into dArkMoss." $height $width 2>&1 > /dev/tty1 | sleep 5
+  dialog --infobox "Card set up. The system will now reboot into dArkMoss." $height $width 2>&1 > /dev/tty1 | sleep 5
 else
-  dialog --infobox "Root filesystem expansion failed. dArkMoss will still boot - the rootfs just will not use the whole card. The system will now reboot." $height $width 2>&1 > /dev/tty1 | sleep 10
+  dialog --infobox "Card setup failed. dArkMoss will still boot, but the card may not be fully used. The system will now reboot." $height $width 2>&1 > /dev/tty1 | sleep 10
 fi
 reboot

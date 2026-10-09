@@ -106,7 +106,7 @@ sudo chroot Arkbuild/ bash -c "systemctl disable killer_daemon"
 sudo cp amiga/amiga.sh Arkbuild/usr/local/bin/
 
 #Generate the post-firstboot fstab. No /roms line and no /opt/system/Tools bind:
-#there is no EASYROMS partition on this image - see the strip note below.
+#mount-spruce.sh mounts spruce - see the strip note below.
 if [ "$ROOT_FILESYSTEM_FORMAT" == "btrfs" ]; then
   ROOT_FILESYSTEM_MOUNT_OPTIONS="${ROOT_FILESYSTEM_MOUNT_OPTIONS},ssd_spread"
 fi
@@ -442,13 +442,12 @@ sudo chroot Arkbuild/ bash -c "chown -R ark:ark /home/ark"
 # scan scripts and eight es-theme-* clones), tarred it into /roms.tar, and
 # staged more themes in /tempthemes for firstboot to unpack onto EASYROMS.
 #
-# spruce is the frontend, it lives on TF2, and emulationstation.service is
+# spruce is the frontend and emulationstation.service is
 # masked - nothing on this image reads /roms. Dropping the lot also takes a
 # pile of network fetches out of the build, each of which upstream retries
 # forever on failure.
 #
-# See setup_partition-rk3566.sh (no p5) and scripts/expandtoexfat.sh.rk3566
-# (rootfs grow only).
+# See scripts/expandtoexfat.sh.rk3566.
 # --- end strip -------------------------------------------------------------
 
 sync

@@ -91,8 +91,7 @@ sudo chroot Arkbuild/ bash -c "systemctl disable killer_daemon"
 # Add amiga script
 sudo cp amiga/amiga.sh Arkbuild/usr/local/bin/
 
-#Generate the post-firstboot fstab. No /roms line: there is no EASYROMS
-#partition on this image, spruce lives on TF2.
+#Generate the post-firstboot fstab. No /roms line: mount-spruce.sh mounts spruce.
 if [ "$ROOT_FILESYSTEM_FORMAT" == "btrfs" ]; then
   ROOT_FILESYSTEM_MOUNT_OPTIONS="${ROOT_FILESYSTEM_MOUNT_OPTIONS},ssd_spread"
 fi
@@ -401,8 +400,8 @@ sudo chroot Arkbuild/ bash -c "chown -R ark:ark /home/ark"
 # Upstream staged ES themes in /tempthemes here, then below formatted the ROMS
 # partition and filled it with an ES ROM tree, PortMaster and ThemeMaster
 # installers, pico-8 carts and launch images, tarred into /roms.tar for
-# firstboot. spruce is the frontend and lives on TF2, so none of it is built.
-# See setup_partition.sh (no ROMS partition) and scripts/expandtoexfat.sh.rk3326.
+# firstboot. spruce is the frontend, so none of it is built.
+# See scripts/expandtoexfat.sh.rk3326.
 # --- end strip -------------------------------------------------------------
 
 sync

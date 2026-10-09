@@ -49,11 +49,8 @@ GUID_BASIC_DATA="EBD0A0A2-B9E5-4433-87C0-68B6B72699C7"
 # Partition layout (sector = 512B)
 # name, start_sector, end_sector, guid
 #
-# No ROMS partition. Upstream dArkOS ships a 79MB p5 stub that firstboot then
-# blows up into an EASYROMS exfat volume filling the card. spruce is the
-# frontend, it lives on TF2, and nothing on this image ever reads /roms - so
-# TF1 is boot + rootfs only and firstboot grows the rootfs into the whole card
-# instead. See scripts/expandtoexfat.sh.rk3566.
+# No p5 stub as upstream ships: firstboot adds the SPRUCEOS p5 behind the
+# rootfs. See scripts/expandtoexfat.sh.rk3566.
 declare -a PARTS=(
   "uboot 16384 24575 $GUID_UBOOT"          # 4MB
   "resource 24576 32767 $GUID_RESOURCE"    # 4MB
