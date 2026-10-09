@@ -13,6 +13,10 @@ on:
         description: "Comma-separated units (blank = every unit in .github/units.txt)"
         required: false
         default: ""
+      replace:
+        description: "Swap only these units into the current beta of the same version"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -86,7 +90,29 @@ jobs:
           TAG: beta-${{ github.ref_name }}
           VERSION: ${{ inputs.version }}
           UNITS: ${{ needs.plan.outputs.units }}
+          REPLACE: ${{ inputs.replace }}
         run: |
+          if [ "$REPLACE" = true ]; then
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body -q .body > notes.md \
+              || { echo "::error::no $TAG to update"; exit 1; }
+            grep -qx "Version: ${VERSION}" notes.md || { echo "::error::$TAG is not ${VERSION}"; exit 1; }
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p SHA256SUMS -O old.sums
+            for u in $(jq -r '.[]' <<<"$UNITS"); do
+              prefix="dArkMoss_${u^^}_"
+              gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' \
+                | grep "^${prefix}" | while read -r a; do
+                  gh release delete-asset "$TAG" "$a" --repo "$GITHUB_REPOSITORY" --yes
+                done
+              grep -v "  ${prefix}" old.sums > old.tmp || true
+              mv old.tmp old.sums
+            done
+            cat old.sums SHA256SUMS | sort -k2 > merged.sums
+            mv merged.sums SHA256SUMS
+            gh release upload "$TAG" *.img.7z* *.dmupd SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
+            echo "Rebuilt $(jq -r 'join(" ")' <<<"$UNITS") at ${GITHUB_SHA}" >> notes.md
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+            exit 0
+          fi
           # Asset names carry the date and version, so start from an empty release.
           gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes 2>/dev/null || true
           cat > notes.md <<EOF
