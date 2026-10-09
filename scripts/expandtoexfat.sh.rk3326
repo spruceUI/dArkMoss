@@ -1,5 +1,5 @@
 #!/bin/bash
-# Firstboot: cap the rootfs at 11GB and give the rest of the card to an exFAT
+# Firstboot: cap the rootfs at 11GB and give the rest of the card to a FAT32
 # SPRUCEOS partition (p3), so spruce can live on this card too. A card with no
 # room past 11GB gets the rootfs alone.
 #
@@ -47,11 +47,11 @@ exitcode=1
 	echo 50
 	if [ "$make_data" = 1 ]; then
 		# An explicit start: --append alone takes the first gap, which is U-Boot.
-		echo "start=$data_start, type=7" | \
+		echo "start=$data_start, type=c" | \
 			sudo sfdisk --append --no-reread --force /dev/${primary_block} &> /dev/null
 		sudo partx -a -n 3 /dev/${primary_block} &> /dev/null
 		sleep 2
-		sudo mkfs.exfat -c 16K -L SPRUCEOS /dev/${primary_block}p3 &> /dev/null || echo 1 > /tmp/code.txt
+		sudo mkfs.vfat -F 32 -n SPRUCEOS /dev/${primary_block}p3 &> /dev/null || echo 1 > /tmp/code.txt
 	fi
 	echo 80
 	sync
