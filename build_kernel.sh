@@ -20,6 +20,9 @@ else
   elif [ "$UNIT" == "v10" ]; then
     # 320x480 portrait panel, as the OGA kernel boots it (rgb10 above).
     SCREEN_ROTATION="3"
+  elif [ "$UNIT" == "pixel2" ]; then
+    # Mainline gives its panel rotation = <270>, as on the OGA.
+    SCREEN_ROTATION="3"
   else
     SCREEN_ROTATION="0"
   fi
@@ -30,15 +33,15 @@ fi
 if [ ! -d "$KERNEL_SRC" ]; then
   git clone --recursive --depth=1 https://github.com/christianhaitian/linux.git -b $KERNEL_SRC $KERNEL_SRC
 fi
-if [ "$UNIT" == "xumini" ] && [ ! -f "$KERNEL_SRC/arch/arm64/boot/dts/rockchip/rk3326-xumini-linux.dts" ]; then
-  # Temporary: christianhaitian/linux's rg351 has no xumini unit of its own
-  # yet. This is a plain 3-patch series (DTS, xu10-joypad driver, defconfig
-  # line) meant to git-am cleanly onto rg351 as-is; drop this whole block
-  # for a one-line change if rg351 ever carries the board itself.
+UNIT_DTS="$KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB%.dtb}.dts"
+if [ -d "patches/${UNIT}/kernel/series" ] && [ ! -f "$UNIT_DTS" ]; then
+  # Boards christianhaitian/linux's rg351 does not carry (xumini, pixel2): a
+  # plain series (DTS, drivers, defconfig) that git-ams cleanly onto rg351
+  # as-is; drop a unit's series if rg351 ever carries the board itself.
   # Absolute path: the shell expands the glob from here, not from $KERNEL_SRC.
   git -C $KERNEL_SRC -c user.name=dArkMoss -c user.email=dArkMoss@localhost \
-    am "$PWD"/patches/xumini/kernel/series/*.patch
-  test -f "$KERNEL_SRC/arch/arm64/boot/dts/rockchip/rk3326-xumini-linux.dts"
+    am "$PWD"/patches/${UNIT}/kernel/series/*.patch
+  test -f "$UNIT_DTS"
   verify_action
 fi
 cd $KERNEL_SRC
@@ -54,6 +57,7 @@ done
 case "$UNIT" in
   g350)   KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   v10)    KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
+  pixel2) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   xumini) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity rk817-plugin-online" ;;
   *)      KERNEL_OPTIN="" ;;
 esac

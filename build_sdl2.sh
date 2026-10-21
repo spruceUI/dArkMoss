@@ -51,9 +51,9 @@ else
 fi
 
 extension=$(sudo grep -oP '(?<=extension=").*?(?=")' ${CHROOT_DIR}/home/ark/${CHIPSET}_core_builds/scripts/sdl2.sh)
-if [ "$UNIT" == "v10" ]; then
-  # V10: the stock odroidgoa RGA ROT_270 build (the "...rotated" one) for
-  # its 320x480 portrait panel, not the a10miniv4 rotate180 pass that
+if [ "$UNIT" == "v10" ] || [ "$UNIT" == "pixel2" ]; then
+  # V10, Pixel 2: the stock odroidgoa RGA ROT_270 build (the "...rotated" one)
+  # for their portrait panels, not the a10miniv4 rotate180 pass that
   # "make install" leaves in place (see xumini below).
   sudo chroot ${CHROOT_DIR}/ bash -c "cp -f /home/ark/${CHIPSET}_core_builds/sdl2-${BITNESS}/libSDL2-2.0.so.0.$extension.rotated /usr/lib/${ARCH}/libSDL2-2.0.so.0.$extension"
 elif [ "$UNIT" == "xumini" ]; then
@@ -61,7 +61,7 @@ elif [ "$UNIT" == "xumini" ]; then
   # rotate180 pass, unconditional upstream); install our ROT_90 variant
   # instead, saved mid-build as "...rotated" before that pass ran.
   sudo chroot ${CHROOT_DIR}/ bash -c "cp -f /home/ark/${CHIPSET}_core_builds/sdl2-${BITNESS}/libSDL2-2.0.so.0.$extension.rotated /usr/lib/${ARCH}/libSDL2-2.0.so.0.$extension"
-elif [[ "$UNIT" != *"rgb10"* ]] && [ "$UNIT" != "v10" ] && [ "$UNIT" != "rk2020" ] && [ "$CHIPSET" == "rk3326" ]; then
+elif [[ "$UNIT" != *"rgb10"* ]] && [ "$UNIT" != "v10" ] && [ "$UNIT" != "pixel2" ] && [ "$UNIT" != "rk2020" ] && [ "$CHIPSET" == "rk3326" ]; then
   sudo chroot ${CHROOT_DIR}/ bash -c "cp -f /home/ark/${CHIPSET}_core_builds/sdl2-${BITNESS}/libSDL2-2.0.so.0.$extension /usr/lib/${ARCH}/."
 fi
 sudo chroot ${CHROOT_DIR}/ bash -c "ln -sfv /usr/lib/${ARCH}/libSDL2.so /usr/lib/${ARCH}/libSDL2-2.0.so.0"

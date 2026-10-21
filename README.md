@@ -67,6 +67,7 @@ Units:
 | a10mini | A10 Mini (RK3326) | `make a10mini` | `build_a10mini.sh` |
 | g350 | G350 (RK3326) | `make g350` | `build_g350.sh` |
 | v10 | Powkiddy V10 (RK3326) | `make v10` | `build_v10.sh` |
+| pixel2 | GKD Pixel 2 (RK3326S) | `make pixel2` | `build_pixel2.sh` |
 | xumini | MagicX XU Mini M (RK3326) | `make xumini` | `build_xumini.sh` |
 
 Images are built on GitHub Actions, not locally. Under Actions:

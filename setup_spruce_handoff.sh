@@ -156,6 +156,7 @@ case "$UNIT" in
   a10mini)   HW_DEVICE_NAME="A10 Mini" ;;
   g350)      HW_DEVICE_NAME="G350" ;;
   v10)       HW_DEVICE_NAME="Powkiddy V10" ;;
+  pixel2)    HW_DEVICE_NAME="GKD Pixel 2" ;;
   xumini)    HW_DEVICE_NAME="XU Mini M" ;;
   *)         HW_DEVICE_NAME="" ;;
 esac
@@ -173,6 +174,7 @@ case "$UNIT" in
   a10mini)   SPRUCE_PLATFORM_NAME="A10Mini" ;;
   g350)      SPRUCE_PLATFORM_NAME="G350" ;;
   v10)       SPRUCE_PLATFORM_NAME="V10" ;;
+  pixel2)    SPRUCE_PLATFORM_NAME="Pixel2" ;;
   xumini)    SPRUCE_PLATFORM_NAME="XUMiniM" ;;
   *)         SPRUCE_PLATFORM_NAME="" ;;
 esac
@@ -196,5 +198,9 @@ fi
 # systemd-remount-fs fail on every boot; plain "zlib" is the same algorithm.
 if [ "$UNIT" == "v10" ]; then
   sudo chroot Arkbuild/ bash -c "systemctl disable welcome-message networking wifi_importer NetworkManager-wait-online wpa_supplicant 2>/dev/null; systemctl mask keyboard-setup.service" || true
+  sudo sed -i 's/compress=zlib:1/compress=zlib/' Arkbuild/etc/fstab
+fi
+# Pixel 2: the same 4.4 fstab fix as the V10.
+if [ "$UNIT" == "pixel2" ]; then
   sudo sed -i 's/compress=zlib:1/compress=zlib/' Arkbuild/etc/fstab
 fi

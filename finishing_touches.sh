@@ -51,7 +51,10 @@ load mmc 1:1 \${dtb_loadaddr} ${KERNEL_DTB}
 ${BOOTI_LINE}
 EOF
 
-if [ "$UNIT" == "xumini" ]; then
+if [ "$UNIT" == "pixel2" ]; then
+  # logos/unrotated/dArkMoss.bmp turned 90 degrees counter-clockwise, matching fbcon=rotate:3.
+  sudo cp logos/pixel2/logo.bmp ${mountpoint}/logo.bmp
+elif [ "$UNIT" == "xumini" ]; then
   # Portrait panel: U-Boot copies the BMP as-is, so the G350's logo is turned 90 degrees
   # clockwise (make-logo.py 480 640 --rotate-cw), the same way as the kernel's fbcon=rotate:1.
   sudo cp logos/xumini/logo.bmp ${mountpoint}/logo.bmp
@@ -139,7 +142,7 @@ fi
 # systemd-remount-fs on every boot; plain "zlib" is the same algorithm. This is
 # the fstab firstboot installs (expandtoexfat), the image's own is fixed in
 # setup_spruce_handoff.sh.
-if [ "$UNIT" == "v10" ]; then
+if [ "$UNIT" == "v10" ] || [ "$UNIT" == "pixel2" ]; then
   ROOT_FILESYSTEM_MOUNT_OPTIONS="${ROOT_FILESYSTEM_MOUNT_OPTIONS//compress=zlib:1/compress=zlib}"
 fi
 cat <<EOF | sudo tee ${mountpoint}/fstab.exfat
@@ -220,7 +223,7 @@ sudo cp dArkOS_Tools/*.sh Arkbuild/opt/system/
 sudo cp dArkOS_Tools/${CHIPSET}/*.sh Arkbuild/opt/system/Advanced/
 sudo cp dArkOS_Tools/Advanced/*.sh Arkbuild/opt/system/Advanced/
 sudo cp scripts/"Enable Quick Mode".sh Arkbuild/opt/system/Advanced/
-if [[ "$UNIT" == *"rgb10"* ]] || [[ "$UNIT" == "v10" ]] || [[ "$UNIT" == "rk2020" ]] || [[ "$UNIT" == *"oga"* ]]; then
+if [[ "$UNIT" == *"rgb10"* ]] || [[ "$UNIT" == "v10" ]] || [[ "$UNIT" == "pixel2" ]] || [[ "$UNIT" == "rk2020" ]] || [[ "$UNIT" == *"oga"* ]]; then
   sudo cp dArkOS_Tools/OGA/*.sh Arkbuild/opt/system/Advanced/
 else
   sudo cp scripts/Switch* Arkbuild/usr/local/bin/
@@ -342,7 +345,7 @@ sudo chroot Arkbuild/ bash -c "ln -sfv /roms/themes/ /etc/emulationstation/theme
 
 # Also expose /roms2/themes via the user themes path so ES picks up themes
 # from the second SD card in SD2-for-Roms mode (dangles harmlessly otherwise).
-if [[ "$UNIT" != *"rgb10"* ]] && [[ "$UNIT" != "v10" ]] && [[ "$UNIT" != "rk2020" ]] && [[ "$UNIT" != *"oga"* ]]; then
+if [[ "$UNIT" != *"rgb10"* ]] && [[ "$UNIT" != "v10" ]] && [[ "$UNIT" != "pixel2" ]] && [[ "$UNIT" != "rk2020" ]] && [[ "$UNIT" != *"oga"* ]]; then
   sudo chroot Arkbuild/ bash -c "ln -sfv /roms2/themes/ /home/ark/.emulationstation/themes"
 fi
 
@@ -398,7 +401,7 @@ cat <<EOF | sudo tee -a Arkbuild/etc/samba/smb.conf
    guest ok = yes
    read list = guest
 EOF
-if [[ "$UNIT" != *"rgb10"* ]] && [[ "$UNIT" != "v10" ]] && [[ "$UNIT" != "rk2020" ]] && [[ "$UNIT" != *"oga"* ]]; then
+if [[ "$UNIT" != *"rgb10"* ]] && [[ "$UNIT" != "v10" ]] && [[ "$UNIT" != "pixel2" ]] && [[ "$UNIT" != "rk2020" ]] && [[ "$UNIT" != *"oga"* ]]; then
   cat <<EOF | sudo tee -a Arkbuild/etc/samba/smb.conf
 [roms2]
    comment = ROMS2
