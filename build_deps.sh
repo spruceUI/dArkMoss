@@ -30,9 +30,12 @@ fi
 # hashed as its name, so the wrong one would never invalidate the cache.
 BOOTSTRAP_SCRIPT=bootstrap_rootfs-${CHIPSET}.sh
 [ -f "$BOOTSTRAP_SCRIPT" ] || BOOTSTRAP_SCRIPT=bootstrap_rootfs.sh
+# The chroot carries libmali; the Pixel 2 (5.10 kernel) needs a different one than
+# the other rk3326 units. Empty for everyone else, so their keys are unchanged.
+[ "$UNIT" == "pixel2" ] && DEPS_MALI_KEY="$whichmali"
 DEPS_CACHE_KEY="$(bc_key needed_packages.txt needed_dev_packages.txt build_deps.sh \
     "$BOOTSTRAP_SCRIPT" \
-    "${DEBIAN_CODE_NAME}" "${CHIPSET}" "${BUILD_ARMHF}" "${BIT}")"
+    "${DEBIAN_CODE_NAME}" "${CHIPSET}" "${BUILD_ARMHF}" "${BIT}" "${DEPS_MALI_KEY}")"
 DEPS_CACHE_ASSET="chroot-deps-${CHIPSET}-${BIT}-${DEPS_CACHE_KEY}.tar.zst"
 DEPS_FROM_CACHE=n
 

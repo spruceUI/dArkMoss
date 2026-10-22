@@ -1,7 +1,17 @@
 #!/bin/bash
 
 # Build and install custom kernel from christianhaitian/linux
-if [ "$UNIT" == "rgb10" ] || [ "$UNIT" == "rk2020" ]; then
+if [ "$UNIT" == "pixel2" ]; then
+  # RK3326S (PX30S): 4.4 has no PX30S support, Christian's 5.10 does. Its
+  # multi-SoC rk3566 defconfig carries PX30, plus a fragment for USB Wi-Fi.
+  KERNEL_SRC="kernel_5_10_226"
+  KERNEL_REPO="https://github.com/christianhaitian/kernel_5_10_226.git"
+  DEF_CONFIG="rk3566_optimized_linux_defconfig"
+  DEF_CONFIG_FRAGMENT="patches/pixel2/kernel/pixel2.config"
+  # Mainline gives its panel rotation = <270>, as on the OGA.
+  SCREEN_ROTATION="3"
+  KERNEL_DTB="rk3326s-gkd-pixel2.dtb"
+elif [ "$UNIT" == "rgb10" ] || [ "$UNIT" == "rk2020" ]; then
   KERNEL_SRC="odroidgoA-4.4.y"
   DEF_CONFIG="odroidgoa_tweaked_defconfig"
   SCREEN_ROTATION="3"
@@ -20,9 +30,6 @@ else
   elif [ "$UNIT" == "v10" ]; then
     # 320x480 portrait panel, as the OGA kernel boots it (rgb10 above).
     SCREEN_ROTATION="3"
-  elif [ "$UNIT" == "pixel2" ]; then
-    # Mainline gives its panel rotation = <270>, as on the OGA.
-    SCREEN_ROTATION="3"
   else
     SCREEN_ROTATION="0"
   fi
@@ -30,14 +37,16 @@ else
   # V10: no dts of its own; rg351 carries the OGA 1.1 one dArkOS boots it with.
   [ "$UNIT" == "v10" ] && KERNEL_DTB="${CHIPSET}-odroidgo2-linux-v11.dtb"
 fi
-if [ ! -d "$KERNEL_SRC" ]; then
+if [ ! -d "$KERNEL_SRC" ] && [ -n "$KERNEL_REPO" ]; then
+  git clone --depth=1 $KERNEL_REPO $KERNEL_SRC
+elif [ ! -d "$KERNEL_SRC" ]; then
   git clone --recursive --depth=1 https://github.com/christianhaitian/linux.git -b $KERNEL_SRC $KERNEL_SRC
 fi
 UNIT_DTS="$KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB%.dtb}.dts"
 if [ -d "patches/${UNIT}/kernel/series" ] && [ ! -f "$UNIT_DTS" ]; then
-  # Boards christianhaitian/linux's rg351 does not carry (xumini, pixel2): a
-  # plain series (DTS, drivers, defconfig) that git-ams cleanly onto rg351
-  # as-is; drop a unit's series if rg351 ever carries the board itself.
+  # Boards Christian's kernels do not carry (xumini on rg351, pixel2 on
+  # 5.10): a plain series (DTS, drivers, defconfig) that git-ams cleanly onto
+  # the tree as-is; drop a unit's series if the tree ever carries the board.
   # Absolute path: the shell expands the glob from here, not from $KERNEL_SRC.
   git -C $KERNEL_SRC -c user.name=dArkMoss -c user.email=dArkMoss@localhost \
     am "$PWD"/patches/${UNIT}/kernel/series/*.patch
@@ -57,7 +66,6 @@ done
 case "$UNIT" in
   g350)   KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   v10)    KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
-  pixel2) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   xumini) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity rk817-plugin-online" ;;
   *)      KERNEL_OPTIN="" ;;
 esac
@@ -75,6 +83,17 @@ if [ "$UNIT" == "g350" ]; then
   done
 fi
 make ARCH=arm64 ${DEF_CONFIG}
+if [ -n "$DEF_CONFIG_FRAGMENT" ]; then
+  # dArkMoss's 5.10 fixes (build_kernel-rk3566.sh applies the same set).
+  for patch in ../scripts/kernel/*.patch; do
+    git apply -R --check "$patch" 2>/dev/null && continue
+    git apply "$patch"
+    verify_action
+  done
+  ARCH=arm64 scripts/kconfig/merge_config.sh -m .config ../${DEF_CONFIG_FRAGMENT}
+  make ARCH=arm64 olddefconfig
+  verify_action
+fi
 CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare
 CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs modules
 verify_action

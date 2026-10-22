@@ -1,0 +1,84 @@
+From 7c000f8e6dff965129367219bf83b61e545be0ae Mon Sep 17 00:00:00 2001
+From: SundownerSport <barrettwiggin@gmail.com>
+Date: Wed, 21 Oct 2026 16:49:47 -0700
+Subject: [PATCH 2/3] Input: singleadcjoy: allow a buttons-only pad and set the
+ vendor ID
+
+amux-count = <0> registers the GPIO buttons with no axes and skips the
+ADC and mux setup. joypad-vendor overrides the 0x484B vendor ID. Both are
+optional, so existing boards are unchanged.
+---
+ drivers/input/joystick/singleadcjoy.c | 26 +++++++++++++++++---------
+ 1 file changed, 17 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/input/joystick/singleadcjoy.c b/drivers/input/joystick/singleadcjoy.c
+index e2cad39..af14256 100644
+--- a/drivers/input/joystick/singleadcjoy.c
++++ b/drivers/input/joystick/singleadcjoy.c
+@@ -489,6 +489,9 @@ static ssize_t joypad_show_amux_debug(struct device *dev,
+ 	ssize_t pos;
+ 	int value;
+ 
++	if (!amux)
++		return sprintf(buf, "no analog inputs\n");
++
+ 	mutex_lock(&joypad->lock);
+ 
+ 	/* disable poll driver */
+@@ -1089,6 +1092,7 @@ static int joypad_input_setup(struct device *dev, struct joypad *joypad)
+ 	int nbtn, error;
+ 	u32 joypad_revision = 0;
+ 	u32 joypad_product = 0;
++	u32 joypad_vendor = 0x484B;
+ 
+ 	poll_dev = devm_input_allocate_polled_device(dev);
+ 	if (!poll_dev) {
+@@ -1112,12 +1116,14 @@ static int joypad_input_setup(struct device *dev, struct joypad *joypad)
+ 	device_property_read_u32(dev, "joypad-revision", &joypad_revision);
+ 	device_property_read_u32(dev, "joypad-product", &joypad_product);
+ 	input->id.bustype = BUS_HOST;
+-	input->id.vendor  = 0x484B;
++	device_property_read_u32(dev, "joypad-vendor", &joypad_vendor);
++	input->id.vendor  = (u16)joypad_vendor;
+ 	input->id.product = (u16)joypad_product;
+ 	input->id.version = (u16)joypad_revision;
+ 
+ 	/* IIO ADC key setup (0 mv ~ 1800 mv) * adc->scale */
+-	__set_bit(EV_ABS, input->evbit);
++	if (joypad->amux_count)
++		__set_bit(EV_ABS, input->evbit);
+ 	for(nbtn = 0; nbtn < joypad->amux_count; nbtn++) {
+ 		struct bt_adc *adc = &joypad->adcs[nbtn];
+ 		input_set_abs_params(input, adc->report_type,
+@@ -1261,19 +1267,21 @@ static int joypad_dt_parse(struct device *dev, struct joypad *joypad)
+ 
+ 	joypad->bt_gpio_count = device_get_child_node_count(dev);
+ 
+-	if ((joypad->amux_count == 0) || (joypad->bt_gpio_count == 0)) {
++	if (joypad->bt_gpio_count == 0) {
+ 		dev_err(dev, "adc key = %d, gpio key = %d error!",
+ 			joypad->amux_count, joypad->bt_gpio_count);
+ 		return -EINVAL;
+ 	}
+ 
+-	error = joypad_adc_setup(dev, joypad);
+-	if (error)
+-		return error;
++	if (joypad->amux_count) {
++		error = joypad_adc_setup(dev, joypad);
++		if (error)
++			return error;
+ 
+-	error = joypad_amux_setup(dev, joypad);
+-	if (error)
+-		return error;
++		error = joypad_amux_setup(dev, joypad);
++		if (error)
++			return error;
++	}
+ 
+ 	error = joypad_gpio_setup(dev, joypad);
+ 	if (error)
+-- 
+2.55.0
+

@@ -17,8 +17,8 @@ if [ -f "build.log" ]; then
   done
 fi
 (
-# dArkMoss for the GKD Pixel 2 (RK3326S) on the rg351 kernel the G350, A10 Mini
-# and Mini M use, with our rk3326-pixel2-linux.dts (patches/pixel2/kernel).
+# dArkMoss for the GKD Pixel 2 (RK3326S) on Christian's 5.10 kernel (4.4 has no
+# PX30S support), with rk3326s-gkd-pixel2.dts (patches/pixel2/kernel).
 # Set chipset in environment variable
 export CHIPSET=rk3326
 export UNIT=pixel2

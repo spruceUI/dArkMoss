@@ -34,7 +34,10 @@ if [ -d "$OPT_TOOLCHAIN_DIR" ]; then
 else
     export PATH="$LOCAL_TOOLCHAIN_DIR"/bin/:$PATH
 fi
-if [ "$CHIPSET" == "rk3326" ]; then
+if [ "$UNIT" == "pixel2" ]; then
+  # 5.10 Bifrost kernel driver (g25p0), as the rk3566 units: a g-series libmali.
+  export whichmali=libmali-bifrost-g31-g13p0-gbm.so
+elif [ "$CHIPSET" == "rk3326" ]; then
   export whichmali=libmali-bifrost-g31-rxp0-gbm.so
 else
   export whichmali=libmali-bifrost-g52-g29p1.so
