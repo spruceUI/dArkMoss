@@ -1,8 +1,13 @@
 #!/bin/bash
 
 # Create boot.ini
-if [ "$UNIT" == "rg351mp" ]; then
+# pixel2 (5.10): the Image runs past 0x04000000, so the initrd goes below the kernel as on
+# rg351mp, and must end before the DTB at 0x01f00000.
+if [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "pixel2" ]; then
   INITRD_LOADERADDRESS="0x01100000"
+  if [ "$UNIT" == "pixel2" ] && [ "$(stat -c %s ${mountpoint}/uInitrd)" -gt $((0x01f00000 - 0x01100000)) ]; then
+    echo "ERROR: uInitrd does not fit between 0x01100000 and the DTB at 0x01f00000"; exit 1
+  fi
 else
   INITRD_LOADERADDRESS="0x04000000"
 fi
