@@ -31,6 +31,9 @@ if [ "$UNIT" == "pixel2" ]; then
   patch -p1 < ../patches/pixel2/uboot/0001-arch-arm-dts-Makefile.patch
   # PX30S DDR set point init, run by boot.ini for the /darkmoss-px30s boot.
   patch -p1 < ../patches/pixel2/uboot/0002-px30-dmc_fsp-command.patch
+  # dmc_fsp put u-boot.bin 3.5 KiB over make.sh's 1022 KiB pack limit (B194: no loader packed);
+  # dArkMoss boots with booti, so this unit's U-Boot drops the EFI loader to make room.
+  sed -i -e '/^CONFIG_CMD_BOOTEFI/d' -e 's/^CONFIG_EFI_LOADER=y/# CONFIG_EFI_LOADER is not set/' configs/odroidgoa_defconfig
   cp ../patches/pixel2/uboot/pixel2-uboot.dts arch/arm/dts/
   # RK3326S needs newer rkbin blobs (twigUI-next's); this BL31 loads at 0x40000.
   RKBIN_URL="https://github.com/rockchip-linux/rkbin/raw/74213af1e952c4683d2e35952507133b61394862/bin/rk33"
