@@ -83,8 +83,11 @@ if [ "$UNIT" == "pixel2" ]; then
   verify_action
   mkdir -p sd_fuse
   ./tools/mkimage -n px30 -T rksd -d rkbin/rk3326_ddr_333MHz_v2.11.bin -C bzip2 sd_fuse/idbloader.img
+  verify_action
   cat rkbin/rk3326_miniloader_v1.40.bin >> sd_fuse/idbloader.img
+  verify_action
   rkbin/loaderimage --pack --uboot u-boot-dtb.bin sd_fuse/uboot.img 0x00200000
+  verify_action
   cat > trust.ini <<'EOF'
 [VERSION]
 MAJOR=1
@@ -105,6 +108,7 @@ SEC=0
 PATH=sd_fuse/trust.img
 EOF
   rkbin/trust_merger trust.ini
+  verify_action
 else
   ./make.sh odroidgoa
 fi
