@@ -75,6 +75,12 @@ for fix in $UBOOT_OPTIN; do
   verify_action
 done
 ./make.sh odroidgoa
+# make.sh can stop short (a pack size limit) without this script noticing; no loader means no boot.
+if ! { test -s sd_fuse/idbloader.img && test -s sd_fuse/uboot.img && test -s sd_fuse/trust.img; }; then
+  echo "ERROR: make.sh odroidgoa left no sd_fuse/idbloader.img, uboot.img and trust.img"
+  false
+fi
+verify_action
 
 dd if="sd_fuse/idbloader.img" of="../${DISK}" bs=512 seek=64 conv=sync,noerror,notrunc
 dd if="sd_fuse/uboot.img" of="../${DISK}" bs=512 seek=16384 conv=sync,noerror,notrunc
