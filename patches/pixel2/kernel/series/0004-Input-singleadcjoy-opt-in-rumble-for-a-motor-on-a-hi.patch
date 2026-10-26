@@ -1,0 +1,69 @@
+From ae20b1915fbdf3bf0942fd02b2bde06c7c1c5fdc Mon Sep 17 00:00:00 2001
+From: arkun <56165886+CatalyticArkun@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 22:54:26 -0500
+Subject: [PATCH 4/6] Input: singleadcjoy: opt-in rumble for a motor on a high
+ output
+
+rumble-active-high starts the PWM off at the dts's period and polarity and
+drives the duty in proportion to the level (strong, else weak), so off is a
+low output in every state. Boards without the property are unchanged.
+---
+ drivers/input/joystick/singleadcjoy.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/drivers/input/joystick/singleadcjoy.c b/drivers/input/joystick/singleadcjoy.c
+index af142561b..37df111e4 100644
+--- a/drivers/input/joystick/singleadcjoy.c
++++ b/drivers/input/joystick/singleadcjoy.c
+@@ -86,6 +86,7 @@ struct joypad {
+ 	/* add by trngaje */
+ 	struct input_dev	*input;	/* input device interface */ 
+ 	struct pwm_device	*pwm;	/* pwm device interface */
++	bool rumble_active_high;	/* the motor runs on a high output */
+ 	
+ 	struct device *dev;
+ 	int poll_interval;
+@@ -1068,6 +1069,16 @@ static int joypad_play_effect(struct input_dev *dev, void *data, struct ff_effec
+ 	strong = effect->u.rumble.strong_magnitude;
+ 	weak = effect->u.rumble.weak_magnitude;
+ 
++	/* Duty in proportion to the level at the dts's polarity; off is a low output. */
++	if (joypad->rumble_active_high) {
++		u16 level = strong ? strong : weak;
++
++		pwm_get_state(joypad->pwm, &state);
++		state.duty_cycle = div_u64((u64)level * state.period, 0xffff);
++		state.enabled = level != 0;
++		return pwm_apply_state(joypad->pwm, &state);
++	}
++
+ 	pwm_get_state(joypad->pwm, &state);
+ 	pwm_get_args(joypad->pwm, &pargs);
+ 	
+@@ -1157,6 +1168,15 @@ static int joypad_input_setup(struct device *dev, struct joypad *joypad)
+ 	if (IS_ERR(joypad->pwm) && PTR_ERR(joypad->pwm) != -EPROBE_DEFER) {
+ 		dev_err(dev, "unable to request PWM for rumble\n");
+ 	}
++	/* Start an active-high motor off, at the dts's period and polarity. */
++	if (!IS_ERR(joypad->pwm) && joypad->rumble_active_high) {
++		struct pwm_state state;
++
++		pwm_init_state(joypad->pwm, &state);
++		state.duty_cycle = 0;
++		state.enabled = false;
++		pwm_apply_state(joypad->pwm, &state);
++	}
+ 
+ 	error = joypad_init_ff(joypad);
+ 
+@@ -1264,6 +1284,7 @@ static int joypad_dt_parse(struct device *dev, struct joypad *joypad)
+ 				&joypad->poll_interval);
+ 
+ 	joypad->auto_repeat = device_property_present(dev, "autorepeat");
++	joypad->rumble_active_high = device_property_present(dev, "rumble-active-high");
+ 
+ 	joypad->bt_gpio_count = device_get_child_node_count(dev);
+ 
+-- 
+2.54.0 (Apple Git-157)
+

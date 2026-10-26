@@ -1,0 +1,28 @@
+From 3b369ea6940f76d43dbb36d821f5201363bc4ba3 Mon Sep 17 00:00:00 2001
+From: arkun <56165886+CatalyticArkun@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 22:54:47 -0500
+Subject: [PATCH 5/6] arm64: dts: rockchip: rk3326s-gkd-pixel2: rumble on pwm0
+
+The motor sits on GPIO0_B7 and runs on a high output (plumOS's pwm-vibrator,
+TortOS's rumble-off hog, Twig-Next's pad): pwm0 at 100 kHz, rumble-active-high.
+---
+ arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
+index 73bc75d63..cb2e3b618 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
+@@ -164,6 +164,9 @@ joypad: gamekiddy-joypad {
+         pinctrl-0 = <&btn_pins>;
+         amux-count = <0>;
+         poll-interval = <10>;
++        /* Rumble: pwm0 (GPIO0_B7); the motor runs on a high output. */
++        pwms = <&pwm0 0 10000 0>;
++        rumble-active-high;
+ 
+         sw1 {
+             gpios = <&gpio3 RK_PB5 GPIO_ACTIVE_LOW>;
+-- 
+2.54.0 (Apple Git-157)
+
