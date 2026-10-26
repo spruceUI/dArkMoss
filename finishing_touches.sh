@@ -1,13 +1,27 @@
 #!/bin/bash
 
+# pixel2's RK3326S U-Boot (image_setup.sh) reads extlinux.conf, not the odroidgoa boot.ini.
+# With no DEFAULT line it boots the labels in order, so a label that fails to load falls through.
+if [ "$UNIT" == "pixel2" ]; then
+  PIXEL2_ARGS="root=/dev/mmcblk0p2 rootwait rw fsck.repair=yes net.ifnames=0 fbcon=rotate:${SCREEN_ROTATION} console=/dev/ttyFIQ0 quiet splash consoleblank=0 vt.global_cursor_default=0"
+  sudo mkdir -p ${mountpoint}/extlinux
+  cat <<EOF | sudo tee ${mountpoint}/extlinux/extlinux.conf
+# To boot the PX30S tree (DDR scaling) first, add the line: DEFAULT dArkMoss-px30s
+LABEL dArkMoss
+  LINUX /Image
+  FDT /${KERNEL_DTB}
+  INITRD /uInitrd
+  APPEND ${PIXEL2_ARGS}
+LABEL dArkMoss-px30s
+  LINUX /Image
+  FDT /rk3326s-gkd-pixel2-px30s.dtb
+  INITRD /uInitrd
+  APPEND ${PIXEL2_ARGS}
+EOF
+else
 # Create boot.ini
-# pixel2 (5.10): the Image runs past 0x04000000, so the initrd goes below the kernel as on
-# rg351mp, and must end before the DTB at 0x01f00000.
-if [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "pixel2" ]; then
+if [ "$UNIT" == "rg351mp" ]; then
   INITRD_LOADERADDRESS="0x01100000"
-  if [ "$UNIT" == "pixel2" ] && [ "$(stat -c %s ${mountpoint}/uInitrd)" -gt $((0x01f00000 - 0x01100000)) ]; then
-    echo "ERROR: uInitrd does not fit between 0x01100000 and the DTB at 0x01f00000"; exit 1
-  fi
 else
   INITRD_LOADERADDRESS="0x04000000"
 fi
@@ -37,13 +51,6 @@ else
   INITRD_LOAD_LINE='load mmc 1:1 ${initrd_loadaddr} uInitrd'
   BOOTI_LINE='booti ${loadaddr} ${initrd_loadaddr} ${dtb_loadaddr}'
 fi
-# Pixel 2: with /darkmoss-px30s on BOOT, U-Boot trains the DDR set points (dmc_fsp) and boots
-# the PX30S tree; if dmc_fsp fails it falls back to the default tree.
-if [ "$UNIT" == "pixel2" ]; then
-  PX30S_LINE="if test -e mmc 1:1 /darkmoss-px30s; then if load mmc 1:1 \${dtb_loadaddr} rk3326s-gkd-pixel2-px30s.dtb && dmc_fsp \${dtb_loadaddr}; then echo dArkMoss: PX30S tree; else load mmc 1:1 \${dtb_loadaddr} ${KERNEL_DTB}; fi; fi"
-else
-  PX30S_LINE=""
-fi
 cat <<EOF | sudo tee ${mountpoint}/boot.ini
 odroidgoa-uboot-config
 
@@ -59,9 +66,10 @@ load mmc 1:1 \${loadaddr} Image
 ${INITRD_LOAD_LINE}
 
 load mmc 1:1 \${dtb_loadaddr} ${KERNEL_DTB}
-${PX30S_LINE}
+
 ${BOOTI_LINE}
 EOF
+fi
 
 if [ "$UNIT" == "pixel2" ]; then
   # logos/unrotated/dArkMoss.bmp turned 90 degrees counter-clockwise, matching fbcon=rotate:3.

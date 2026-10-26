@@ -116,13 +116,16 @@ KERNEL_VERSION=$(basename $(ls Arkbuild/lib/modules))
 sudo cp $KERNEL_SRC/.config Arkbuild/boot/config-${KERNEL_VERSION}
 sudo cp $KERNEL_SRC/arch/arm64/boot/Image ${mountpoint}/
 sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB} ${mountpoint}/
-# The PX30S tree (dmc on, Rockchip's PX30S fixups), which boot.ini loads for /darkmoss-px30s.
+# The PX30S tree (dmc on, Rockchip's PX30S fixups), extlinux.conf's dArkMoss-px30s label.
 [ "$UNIT" == "pixel2" ] && sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dtb ${mountpoint}/
 if [[ " $UBOOT_OPTIN " == *" uboot-dtb "* ]]; then
   # image_setup.sh's opt-in: U-Boot loads only uboot.dtb, so that is the one U-Boot
   # dtb on BOOT; every unit's dts stays in the U-Boot tree.
   sudo cp /tmp/${UNIT}-uboot.dtb ${mountpoint}/uboot.dtb
   sudo rm /tmp/${UNIT}-uboot.dtb
+elif [ "$UNIT" == "pixel2" ]; then
+  # The RK3326S U-Boot's own DTB (Twig-Next's), which it loads from BOOT before anything else.
+  sudo cp patches/pixel2/uboot/rk3326s-gkd-pixel2-uboot.dtb ${mountpoint}/
 elif [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "a10mini" ]; then
   sudo cp /tmp/${UNIT}-uboot.dtb ${mountpoint}/rg351mp-uboot.dtb
   sudo rm /tmp/${UNIT}-uboot.dtb
