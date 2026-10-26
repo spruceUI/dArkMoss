@@ -70,6 +70,11 @@ Units:
 | pixel2 | GKD Pixel 2 (RK3326S) | `make pixel2` | `build_pixel2.sh` |
 | xumini | MagicX XU Mini M (RK3326) | `make xumini` | `build_xumini.sh` |
 
+pixel2 is not like the other rk3326 units. The GKD Pixel 2 has one card slot, so
+its first boot adds a SPRUCEOS partition on TF1 for spruce. Its PX30S needs the
+RK3326S U-Boot that Twig-Next ships (AveyondFly's), which loads its own DTB from
+the boot partition, reads `extlinux/extlinux.conf` and shows no logo yet.
+
 Images are built on GitHub Actions, not locally. Under Actions:
 
 - **build-all** takes a version (`v1.2.3`) and optionally a list of units
