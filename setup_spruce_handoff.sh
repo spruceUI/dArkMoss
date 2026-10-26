@@ -174,7 +174,9 @@ case "$UNIT" in
   a10mini)   SPRUCE_PLATFORM_NAME="A10Mini" ;;
   g350)      SPRUCE_PLATFORM_NAME="G350" ;;
   v10)       SPRUCE_PLATFORM_NAME="V10" ;;
-  pixel2)    SPRUCE_PLATFORM_NAME="Pixel2" ;;
+  # spruce's "Pixel2" is the Twig-Next base (sway, /usr/bin/MainUI), so this
+  # unit is a platform of its own, as every other dArkMoss unit is.
+  pixel2)    SPRUCE_PLATFORM_NAME="Pixel2DarkMoss" ;;
   xumini)    SPRUCE_PLATFORM_NAME="XUMiniM" ;;
   *)         SPRUCE_PLATFORM_NAME="" ;;
 esac

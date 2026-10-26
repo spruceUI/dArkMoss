@@ -25,7 +25,8 @@ case "$UNIT" in
   a10mini)   DMUPD_PLATFORM="A10Mini" ;;
   g350)      DMUPD_PLATFORM="G350" ;;
   v10)       DMUPD_PLATFORM="V10" ;;
-  pixel2)    DMUPD_PLATFORM="Pixel2" ;;
+  # Same name as setup_spruce_handoff.sh: spruce's "Pixel2" is the Twig-Next base.
+  pixel2)    DMUPD_PLATFORM="Pixel2DarkMoss" ;;
   xumini)    DMUPD_PLATFORM="XUMiniM" ;;
   *)         DMUPD_PLATFORM="" ;;
 esac
