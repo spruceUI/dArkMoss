@@ -37,6 +37,13 @@ else
   INITRD_LOAD_LINE='load mmc 1:1 ${initrd_loadaddr} uInitrd'
   BOOTI_LINE='booti ${loadaddr} ${initrd_loadaddr} ${dtb_loadaddr}'
 fi
+# Pixel 2: with /darkmoss-px30s on BOOT, U-Boot trains the DDR set points (dmc_fsp) and boots
+# the PX30S tree; if dmc_fsp fails it falls back to the default tree.
+if [ "$UNIT" == "pixel2" ]; then
+  PX30S_LINE="if test -e mmc 1:1 /darkmoss-px30s; then if load mmc 1:1 \${dtb_loadaddr} rk3326s-gkd-pixel2-px30s.dtb && dmc_fsp \${dtb_loadaddr}; then echo dArkMoss: PX30S tree; else load mmc 1:1 \${dtb_loadaddr} ${KERNEL_DTB}; fi; fi"
+else
+  PX30S_LINE=""
+fi
 cat <<EOF | sudo tee ${mountpoint}/boot.ini
 odroidgoa-uboot-config
 
@@ -52,7 +59,7 @@ load mmc 1:1 \${loadaddr} Image
 ${INITRD_LOAD_LINE}
 
 load mmc 1:1 \${dtb_loadaddr} ${KERNEL_DTB}
-
+${PX30S_LINE}
 ${BOOTI_LINE}
 EOF
 

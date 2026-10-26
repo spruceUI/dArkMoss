@@ -29,6 +29,8 @@ if [ "$UNIT" == "xumini" ]; then
 fi
 if [ "$UNIT" == "pixel2" ]; then
   patch -p1 < ../patches/pixel2/uboot/0001-arch-arm-dts-Makefile.patch
+  # PX30S DDR set point init, run by boot.ini for the /darkmoss-px30s boot.
+  patch -p1 < ../patches/pixel2/uboot/0002-px30-dmc_fsp-command.patch
   cp ../patches/pixel2/uboot/pixel2-uboot.dts arch/arm/dts/
   # RK3326S needs newer rkbin blobs (twigUI-next's); this BL31 loads at 0x40000.
   RKBIN_URL="https://github.com/rockchip-linux/rkbin/raw/74213af1e952c4683d2e35952507133b61394862/bin/rk33"

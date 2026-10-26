@@ -1,0 +1,91 @@
+From c34ac24c248089ea7d894bd568c9ec13415de253 Mon Sep 17 00:00:00 2001
+From: arkun <56165886+CatalyticArkun@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 23:05:39 -0500
+Subject: [PATCH 6/6] arm64: dts: rockchip: add rk3326s-gkd-pixel2-px30s (DMC
+ and PX30S fixups)
+
+The PX30S fixups Rockchip's U-Boot applies (bus-apll off, 0.9 V 1.0 V-rails, vdd_logic
+suspend 0.85 V) plus the dmc on its trained 194/328/666 MHz points, for a dmc_fsp boot.
+---
+ arch/arm64/boot/dts/rockchip/Makefile         |  1 +
+ .../dts/rockchip/rk3326s-gkd-pixel2-px30s.dts | 56 +++++++++++++++++++
+ 2 files changed, 57 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dts
+
+diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+index 6e515a981..6d7d80be1 100644
+--- a/arch/arm64/boot/dts/rockchip/Makefile
++++ b/arch/arm64/boot/dts/rockchip/Makefile
+@@ -39,6 +39,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-evb-lp3-v10-linux.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-evb-lp3-v11.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-evb-lp3-v11-avb.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326s-gkd-pixel2.dtb
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326s-gkd-pixel2-px30s.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-evb-lp3-v12-linux.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-odroid-go2.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3326-863-lp3-v10.dtb
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dts b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dts
+new file mode 100644
+index 000000000..a4a25de49
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dts
+@@ -0,0 +1,56 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * GKD Pixel 2 with the PX30S fixups Rockchip's U-Boot writes into the kernel tree
++ * (px30.c rk_board_fdt_fixup), for a boot whose U-Boot ran dmc_fsp first.
++ */
++
++#include "rk3326s-gkd-pixel2.dts"
++
++/ {
++	model = "GameKiddy GKD Pixel2 (PX30S DMC)";
++};
++
++/* DDR scaling over the points dmc_fsp trains (px30s ddr*_params: 194, 328, 666 MHz). */
++&dmc {
++	status = "okay";
++};
++
++&px30s_dmc_opp_table {
++	opp-666000000 {
++		status = "okay";
++	};
++
++	opp-1056000000 {
++		status = "disabled";
++	};
++};
++
++/* Rockchip turns bus-apll off on PX30S; with the dmc on it would also steer vdd_logic. */
++&bus_apll {
++	status = "disabled";
++};
++
++/* PX30S: the fixed 1.0 V rails run at 0.9 V, vdd_logic suspends at 0.85 V. */
++&vcc_1v0 {
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <900000>;
++
++	regulator-state-mem {
++		regulator-suspend-microvolt = <900000>;
++	};
++};
++
++&vcc1v0_soc {
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <900000>;
++
++	regulator-state-mem {
++		regulator-suspend-microvolt = <900000>;
++	};
++};
++
++&vdd_logic {
++	regulator-state-mem {
++		regulator-suspend-microvolt = <850000>;
++	};
++};
+-- 
+2.54.0 (Apple Git-157)
+
