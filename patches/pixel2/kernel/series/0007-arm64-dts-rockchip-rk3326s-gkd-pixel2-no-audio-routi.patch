@@ -1,0 +1,32 @@
+From 7859b9c55a29b5274398d8b5f426784cb7b6ccd4 Mon Sep 17 00:00:00 2001
+From: arkun <56165886+CatalyticArkun@users.noreply.github.com>
+Date: Mon, 26 Oct 2026 15:54:43 -0500
+Subject: [PATCH] arm64: dts: rockchip: rk3326s-gkd-pixel2: no audio-routing on
+ 5.10
+
+This rk817 codec has no DAPM widgets, so the HPOL/HPOR/SPKO routes fail with
+-ENODEV and rk-multicodecs never registers the card or its HEADPHONE extcon.
+Without the routes the card, the jack and the speaker work (tested 2026-10-26).
+---
+ arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
+index cb2e3b618..19511e929 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
+@@ -298,10 +298,7 @@ rk817-sound {
+ 		rockchip,codec = <&rk817_codec>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&hp_det>;
+-		rockchip,audio-routing =
+-			"Headphone", "HPOL",
+-			"Headphone", "HPOR",
+-			"Speaker", "SPKO";
++		/* No rockchip,audio-routing: this rk817 codec has no DAPM widgets to route to. */
+ 	};
+ 
+ 	vccsys: vccsys {
+-- 
+2.54.0 (Apple Git-157)
+
