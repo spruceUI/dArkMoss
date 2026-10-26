@@ -125,11 +125,34 @@ sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/loca
 sudo mkdir -p Arkbuild/usr/local/bin
 sudo cp scripts/spktoggle.sh Arkbuild/usr/local/bin/
 sudo chmod 777 Arkbuild/usr/local/bin/spktoggle.sh
-sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/spktoggle.sh &\") | crontab -"
+# Pixel 2: audiopath.service runs it, and pixel2-jack.service must come after that run.
+if [ "$UNIT" != "pixel2" ]; then
+  sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/spktoggle.sh &\") | crontab -"
+fi
 sudo cp scripts/audiopath.service Arkbuild/etc/systemd/system/audiopath.service
 sudo cp scripts/audiostate.service Arkbuild/etc/systemd/system/audiostate.service
 sudo chroot Arkbuild/ bash -c "systemctl enable audiopath"
 sudo chroot Arkbuild/ bash -c "systemctl enable audiostate"
+# Pixel 2: the 5.10 codec does not follow the jack, so pixel2-jack.sh sets the path after
+# audiopath's SPK_HP and on every extcon change.
+if [ "$UNIT" == "pixel2" ]; then
+  sudo cp scripts/pixel2-jack.sh Arkbuild/usr/local/bin/
+  sudo chmod 755 Arkbuild/usr/local/bin/pixel2-jack.sh
+  echo 'ACTION=="change", SUBSYSTEM=="extcon", RUN+="/usr/local/bin/pixel2-jack.sh"' | sudo tee Arkbuild/etc/udev/rules.d/99-pixel2-jack.rules
+  cat <<EOF | sudo tee Arkbuild/etc/systemd/system/pixel2-jack.service
+[Unit]
+Description=Pixel 2 headphone path
+After=audiopath.service sound.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pixel2-jack.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  sudo chroot Arkbuild/ bash -c "systemctl enable pixel2-jack"
+fi
 
 # Copy necessary tools for expansion of ROOTFS and convert fat32 games partition to exfat on initial boot
 sudo cp scripts/expandtoexfat.sh.${CHIPSET} ${mountpoint}/expandtoexfat.sh
