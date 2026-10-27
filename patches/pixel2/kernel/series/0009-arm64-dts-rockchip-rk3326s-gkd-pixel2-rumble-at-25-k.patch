@@ -1,0 +1,36 @@
+From 602deaad818969d42ba633ad91ab0b7d428b2a85 Mon Sep 17 00:00:00 2001
+From: arkun <56165886+CatalyticArkun@users.noreply.github.com>
+Date: Mon, 26 Oct 2026 20:50:18 -0500
+Subject: [PATCH] arm64: dts: rockchip: rk3326s-gkd-pixel2: rumble at 25 kHz
+ with a boost
+
+TwigUI-Next's values (Wild Emu, 02e24e0be3): a 25 kHz period and +20% on
+every non-zero level, since the motor stalls below ~18%.
+---
+ arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
+index 19511e929..8119a7ea0 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2.dts
+@@ -164,9 +164,14 @@ joypad: gamekiddy-joypad {
+         pinctrl-0 = <&btn_pins>;
+         amux-count = <0>;
+         poll-interval = <10>;
+-        /* Rumble: pwm0 (GPIO0_B7); the motor runs on a high output. */
+-        pwms = <&pwm0 0 10000 0>;
++        /*
++         * Rumble: pwm0 (GPIO0_B7); the motor runs on a high output. 25 kHz, and
++         * +20% on every non-zero level, as Twig-Next: it stalls below ~18%.
++         */
++        pwms = <&pwm0 0 40000 0>;
+         rumble-active-high;
++        rumble-boost-weak = <0x3333>;
++        rumble-boost-strong = <0x3333>;
+ 
+         sw1 {
+             gpios = <&gpio3 RK_PB5 GPIO_ACTIVE_LOW>;
+-- 
+2.54.0 (Apple Git-157)
+
