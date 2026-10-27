@@ -1,0 +1,78 @@
+From 19b7a7fd80d8f1be11efadc1bb6c695f2b0eedd6 Mon Sep 17 00:00:00 2001
+From: arkun <56165886+CatalyticArkun@users.noreply.github.com>
+Date: Tue, 27 Oct 2026 08:21:36 -0500
+Subject: [PATCH] arm64: dts: rockchip: rk3326s-gkd-pixel2-px30s: TwigUI-Next's
+ DMC
+
+Run the dmc on the px30s table as TwigUI-Next does (194/328/1056 MHz, LPDDR4).
+U-Boot's PX30S fixups already apply bus-apll off and the 0.9 V rails to every dtb.
+---
+ .../dts/rockchip/rk3326s-gkd-pixel2-px30s.dts | 46 ++-----------------
+ 1 file changed, 3 insertions(+), 43 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dts b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dts
+index a4a25de49..9745820f0 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dts
+@@ -1,7 +1,7 @@
+ // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+- * GKD Pixel 2 with the PX30S fixups Rockchip's U-Boot writes into the kernel tree
+- * (px30.c rk_board_fdt_fixup), for a boot whose U-Boot ran dmc_fsp first.
++ * GKD Pixel 2 with DDR scaling on, as TwigUI-Next runs it. U-Boot's PX30S fixups (bus-apll off,
++ * 0.9 V 1.0 V-rails, vdd_logic suspend 0.85 V) reach every dtb at boot, so only the dmc differs.
+  */
+ 
+ #include "rk3326s-gkd-pixel2.dts"
+@@ -10,47 +10,7 @@ / {
+ 	model = "GameKiddy GKD Pixel2 (PX30S DMC)";
+ };
+ 
+-/* DDR scaling over the points dmc_fsp trains (px30s ddr*_params: 194, 328, 666 MHz). */
++/* The px30s table as the base dts sets it: 194, 328 and 1056 MHz (LPDDR4). */
+ &dmc {
+ 	status = "okay";
+ };
+-
+-&px30s_dmc_opp_table {
+-	opp-666000000 {
+-		status = "okay";
+-	};
+-
+-	opp-1056000000 {
+-		status = "disabled";
+-	};
+-};
+-
+-/* Rockchip turns bus-apll off on PX30S; with the dmc on it would also steer vdd_logic. */
+-&bus_apll {
+-	status = "disabled";
+-};
+-
+-/* PX30S: the fixed 1.0 V rails run at 0.9 V, vdd_logic suspends at 0.85 V. */
+-&vcc_1v0 {
+-	regulator-min-microvolt = <900000>;
+-	regulator-max-microvolt = <900000>;
+-
+-	regulator-state-mem {
+-		regulator-suspend-microvolt = <900000>;
+-	};
+-};
+-
+-&vcc1v0_soc {
+-	regulator-min-microvolt = <900000>;
+-	regulator-max-microvolt = <900000>;
+-
+-	regulator-state-mem {
+-		regulator-suspend-microvolt = <900000>;
+-	};
+-};
+-
+-&vdd_logic {
+-	regulator-state-mem {
+-		regulator-suspend-microvolt = <850000>;
+-	};
+-};
+-- 
+2.54.0 (Apple Git-157)
+

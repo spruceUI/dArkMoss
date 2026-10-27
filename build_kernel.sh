@@ -116,7 +116,7 @@ KERNEL_VERSION=$(basename $(ls Arkbuild/lib/modules))
 sudo cp $KERNEL_SRC/.config Arkbuild/boot/config-${KERNEL_VERSION}
 sudo cp $KERNEL_SRC/arch/arm64/boot/Image ${mountpoint}/
 sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB} ${mountpoint}/
-# The PX30S tree (dmc on, Rockchip's PX30S fixups), extlinux.conf's dArkMoss-px30s label.
+# The DDR-scaling tree (dmc on, as TwigUI-Next), extlinux.conf's dArkMoss-px30s label.
 [ "$UNIT" == "pixel2" ] && sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dtb ${mountpoint}/
 if [[ " $UBOOT_OPTIN " == *" uboot-dtb "* ]]; then
   # image_setup.sh's opt-in: U-Boot loads only uboot.dtb, so that is the one U-Boot
