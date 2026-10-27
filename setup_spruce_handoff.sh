@@ -44,6 +44,9 @@ sudo chroot Arkbuild/ bash -c "systemctl mask emulationstation.service 2>/dev/nu
 #   Its home was /storage, a JELOS path that does not exist on Debian, so even
 #   a successful login landed on "Could not chdir to home directory".
 echo -e "Creating the spruce SSH account...\n\n"
+sudo cp scripts/spruce/darkmoss-ssh-hostkeys.sh Arkbuild/usr/local/sbin/darkmoss-ssh-hostkeys.sh
+sudo chmod 0755 Arkbuild/usr/local/sbin/darkmoss-ssh-hostkeys.sh
+sudo cp scripts/spruce/darkmoss-ssh-hostkeys.service Arkbuild/etc/systemd/system/darkmoss-ssh-hostkeys.service
 
 # bash -s reading a quoted heredoc, NOT bash -c '...'. A single-quoted -c string
 # cannot contain an apostrophe: the "systemd's" in the comment below closed the
@@ -71,8 +74,11 @@ PermitRootLogin yes
 PasswordAuthentication yes
 EOF
 
-    # Host keys at build time, so turning SSH on is never a first-run surprise.
-    ssh-keygen -A >/dev/null 2>&1 || true
+    # No host keys in the image: openssh-server made these in the build container,
+    # and every unit flashed from it would share them. Each unit makes its own the
+    # first time SSH starts (darkmoss-ssh-hostkeys.service).
+    rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+    systemctl enable darkmoss-ssh-hostkeys.service
 
     # Debian 13 runs SSH socket-activated: ssh.socket listens and spawns
     # sshd@.service per connection. Do NOT enable ssh.service alongside it -

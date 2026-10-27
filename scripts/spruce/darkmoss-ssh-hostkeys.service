@@ -1,0 +1,14 @@
+[Unit]
+Description=Make this unit's own SSH host keys
+# Pulled in by whatever starts sshd. Debian's sshd-keygen.service runs only on
+# systemd's first boot, before spruce ever turns SSH on; if it runs, it runs first.
+After=sshd-keygen.service
+Before=ssh.service sshd@.service ssh.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/darkmoss-ssh-hostkeys.sh
+
+[Install]
+WantedBy=ssh.service sshd@.service ssh.socket
