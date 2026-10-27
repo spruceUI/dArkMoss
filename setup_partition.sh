@@ -25,6 +25,11 @@ elif [[ "$ROOT_FILESYSTEM_FORMAT" == *"ext"* ]]; then
   ROOT_FILESYSTEM_MOUNT_OPTIONS="defaults,noatime"
 fi
 SYSTEM_SIZE=100      # FAT32 boot partition size in MB
+if [ "$UNIT" == "pixel2" ]; then
+  # Its 5.10 boot files are ~44 MB, and an update holds the old and new sets at
+  # once (dmupd-apply.sh), next to any /boot/logs.
+  SYSTEM_SIZE=256
+fi
 STORAGE_SIZE=7500    # Root filesystem size in MB
 BUILD_SIZE=52000     # Initial file system size in MB during the build.  Then will be reduced to the DISK_SIZE or below upon completion
 

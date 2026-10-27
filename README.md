@@ -73,7 +73,9 @@ Units:
 pixel2 is not like the other rk3326 units. The GKD Pixel 2 has one card slot, so
 its first boot adds a SPRUCEOS partition on TF1 for spruce. Its PX30S needs the
 RK3326S U-Boot that Twig-Next ships (AveyondFly's), which loads its own DTB from
-the boot partition, reads `extlinux/extlinux.conf` and shows no logo yet.
+the boot partition, reads `extlinux/extlinux.conf` and shows no logo yet. Its boot
+partition is 256 MB, not 100, because an update holds two sets of its 5.10 boot
+files at once.
 
 Images are built on GitHub Actions, not locally. Under Actions:
 
