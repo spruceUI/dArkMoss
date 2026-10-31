@@ -68,6 +68,7 @@ Units:
 | g350 | G350 (RK3326) | `make g350` | `build_g350.sh` |
 | v10 | Powkiddy V10 (RK3326) | `make v10` | `build_v10.sh` |
 | xumini | MagicX XU Mini M (RK3326) | `make xumini` | `build_xumini.sh` |
+| e5plus | GameMT E5 Plus (RK3566) | `make e5plus` | `build_e5plus.sh` |
 
 Images are built on GitHub Actions, not locally. Under Actions:
 

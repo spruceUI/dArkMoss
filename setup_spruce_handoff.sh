@@ -157,6 +157,7 @@ case "$UNIT" in
   g350)      HW_DEVICE_NAME="G350" ;;
   v10)       HW_DEVICE_NAME="Powkiddy V10" ;;
   xumini)    HW_DEVICE_NAME="XU Mini M" ;;
+  e5plus)    HW_DEVICE_NAME="GameMT E5 Plus" ;;
   *)         HW_DEVICE_NAME="" ;;
 esac
 if [ -n "$HW_DEVICE_NAME" ] && ! grep -q '^HW_DEVICE=' Arkbuild/etc/os-release 2>/dev/null; then
@@ -174,6 +175,7 @@ case "$UNIT" in
   g350)      SPRUCE_PLATFORM_NAME="G350" ;;
   v10)       SPRUCE_PLATFORM_NAME="V10" ;;
   xumini)    SPRUCE_PLATFORM_NAME="XUMiniM" ;;
+  e5plus)    SPRUCE_PLATFORM_NAME="E5Plus" ;;
   *)         SPRUCE_PLATFORM_NAME="" ;;
 esac
 if [ -n "$SPRUCE_PLATFORM_NAME" ] && ! grep -q '^SPRUCE_PLATFORM=' Arkbuild/etc/os-release 2>/dev/null; then

@@ -5,6 +5,9 @@ sudo mkdir -p ${mountpoint}/extlinux
 
 if [[ "$UNIT" == "miniloong" ]]; then
   ROTATE_HZ=" panel_miniloong_pocket1.preferred_refresh_hz=60 fbcon=rotate:3"
+elif [[ "$UNIT" == "e5plus" ]]; then
+  # 720x1280 portrait panel mounted landscape; stock boots with rotate:1 too.
+  ROTATE_HZ=" fbcon=rotate:1"
 else
   ROTATE_HZ=""
 fi

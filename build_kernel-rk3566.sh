@@ -25,8 +25,19 @@ if [ "$UNIT" = "rgb30" ]; then
   RGB20SX_DTB="rk3566-rgb20sx-3"
   RGB30_TF2="rgb30-tf2-nouhs-1"
 fi
+# The GameMT E5 Plus is not in the upstream kernel tree: its dts and its
+# singleadcjoy patch (switch-rxy / invert-absry for the right stick) live in
+# patches/e5plus/kernel and are added below. Keyed only for this unit, so the
+# other units' cached kernels are untouched.
+E5PLUS_DTS=""
+E5PLUS_PATCHES=()
+if [ "$UNIT" = "e5plus" ]; then
+  E5PLUS_DTS="patches/e5plus/kernel/rk3566-e5plus.dts"
+  E5PLUS_PATCHES=(patches/e5plus/kernel/*.patch)
+fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
     "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" "${RGB30_TF2:-}" \
+    ${E5PLUS_DTS:+"$E5PLUS_DTS"} "${E5PLUS_PATCHES[@]}" \
     "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png" \
     scripts/kernel/*.patch \
     "fmt2")"
@@ -101,6 +112,18 @@ if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RGB30_TF2" ]; then
     grep -q "^&sdmmc1 {" "$f" && sed -i '/^&sdmmc1 {/,/^};/{/sd-uhs-/d}' "$f"
     if ! grep -q "^&sdmmc1 {" "$f" || sed -n '/^&sdmmc1 {/,/^};/p' "$f" | grep -q "sd-uhs-"; then
       echo "ERROR: TF2 UHS removal did not apply to $dts."
+      exit 1
+    fi
+  done
+fi
+if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$E5PLUS_DTS" ]; then
+  cp "../$E5PLUS_DTS" arch/arm64/boot/dts/rockchip/
+  grep -q "rk3566-e5plus.dtb" arch/arm64/boot/dts/rockchip/Makefile || \
+    echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3566-e5plus.dtb" >> arch/arm64/boot/dts/rockchip/Makefile
+  for patch in "${E5PLUS_PATCHES[@]}"; do
+    git apply -R --check "../$patch" 2>/dev/null && continue
+    if ! git apply "../$patch"; then
+      echo "ERROR: $patch did not apply."
       exit 1
     fi
   done
