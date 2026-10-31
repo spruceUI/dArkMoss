@@ -127,9 +127,25 @@
 	};
 
 	/*
-	 * Stock drives both lines through the pwrseq: GPIO0_A0 (active high) and
-	 * GPIO0_C0 (WL_REG_ON, active low reset).
+	 * GPIO0_A0 powers the whole RTL8821CS module (Wi-Fi and Bluetooth), as on
+	 * the RGB30. The stock dtb drove it as an active-high pwrseq reset, which
+	 * leaves it LOW once the card is up: on hardware neither the SDIO card
+	 * nor the BT controller ever answered. Hold it high, as the RGB30 does.
 	 */
+	vcc_wifi: vcc-wifi {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_wifi";
+		regulator-always-on;
+		regulator-boot-on;
+		enable-active-high;
+		gpio = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&vcc_wifi_h>;
+	};
+
+	/* GPIO0_C0 is WL_REG_ON. */
 	sdio_pwrseq: sdio-pwrseq {
 		status = "okay";
 		compatible = "mmc-pwrseq-simple";
@@ -138,8 +154,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&wifi_enable_h>;
 		post-power-on-delay-ms = <200>;
-		reset-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>,
-			      <&gpio0 RK_PC0 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio0 RK_PC0 GPIO_ACTIVE_LOW>;
 	};
 
 	vcc_sd: vcc-sd {
@@ -1254,9 +1269,13 @@
 
 	sdio-pwrseq {
 		wifi_enable_h: wifi-enable-h {
-			rockchip,pins =
-				<0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>,
-				<0 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <0 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	power-wlan-bt {
+		vcc_wifi_h: vcc-wifi-h {
+			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
