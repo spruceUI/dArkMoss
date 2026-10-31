@@ -1,8 +1,8 @@
 diff --git a/drivers/input/joystick/singleadcjoy.c b/drivers/input/joystick/singleadcjoy.c
-index e2cad39e..1356d502 100644
+index e2cad39ed..c9e4658a2 100644
 --- a/drivers/input/joystick/singleadcjoy.c
 +++ b/drivers/input/joystick/singleadcjoy.c
-@@ -952,6 +952,36 @@ static int joypad_adc_setup(struct device *dev, struct joypad *joypad)
+@@ -952,6 +952,49 @@ static int joypad_adc_setup(struct device *dev, struct joypad *joypad)
  					__func__, nbtn);
  				return -EINVAL;
  		}
@@ -35,6 +35,19 @@ index e2cad39e..1356d502 100644
 +		/* Invert whichever channel reports ABS_RY (after any swap). */
 +		if (device_property_present(dev, "invert-absry") &&
 +		    adc->report_type == ABS_RY)
++			adc->invert = !adc->invert;
++
++		/*
++		 * This driver inverts the left stick by default
++		 * (__LEFT_JOYSTICK_INVERT__, the RGB30-family wiring).
++		 * invert-absx / invert-absy flip that per axis for boards
++		 * wired the other way (GameMT E5 Plus).
++		 */
++		if (device_property_present(dev, "invert-absx") &&
++		    adc->report_type == ABS_X)
++			adc->invert = !adc->invert;
++		if (device_property_present(dev, "invert-absy") &&
++		    adc->report_type == ABS_Y)
 +			adc->invert = !adc->invert;
  	}
  	return	0;

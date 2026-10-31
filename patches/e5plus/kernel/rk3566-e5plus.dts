@@ -18,8 +18,10 @@
  *    lines, and this panel is 1280 tall.
  *  - Buttons are mostly on gpio4; i2c2 must stay off (its m1 pins are D-pad
  *    down and the stick mux).
- *  - The right stick is wired with X/Y swapped and Y inverted: switch-rxy and
- *    invert-absry, added to singleadcjoy by this unit's kernel patch.
+ *  - The right stick is wired with X/Y swapped and Y inverted, and the left
+ *    stick is not inverted the way this driver assumes: switch-rxy,
+ *    invert-absry, invert-absx and invert-absy, added to singleadcjoy by this
+ *    unit's kernel patch.
  */
 
 /dts-v1/;
@@ -285,6 +287,12 @@
 		/* Right stick: X/Y swapped, Y inverted (stock wiring). */
 		switch-rxy;
 		invert-absry;
+		/*
+		 * Left stick: undo the driver's default left-stick inversion,
+		 * which is the RGB30 family's wiring, not this board's.
+		 */
+		invert-absx;
+		invert-absy;
 
 		poll-interval = <10>;
 
