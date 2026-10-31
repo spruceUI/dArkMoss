@@ -92,6 +92,8 @@
 		simple-audio-card,format = "i2s";
 		simple-audio-card,mclk-fs = <128>;
 		simple-audio-card,name = "rockchip,hdmi";
+		/* Never card 0: see rk817-sound. */
+		linux,snd-card-index = <1>;
 		status = "okay";
 
 		simple-audio-card,cpu {
@@ -108,6 +110,12 @@
 		simple-audio-card,format = "i2s";
 		simple-audio-card,name = "rockchip,rk817-codec";
 		simple-audio-card,mclk-fs = <256>;
+		/*
+		 * dArkMoss and spruce address the codec as card 0. On this board
+		 * both cards wait for the DRM bind and HDMI won the race, so pin
+		 * the indices (0002-asoc-pin-card-index-from-dt.patch).
+		 */
+		linux,snd-card-index = <0>;
 
 		simple-audio-card,cpu {
 			sound-dai = <&i2s1_8ch>;
