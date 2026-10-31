@@ -31,13 +31,21 @@ fi
 # other units' cached kernels are untouched.
 E5PLUS_DTS=""
 E5PLUS_PATCHES=()
+# The E5 Plus radio is an RTL8733BS (SDIO 024C:B733), not the RTL8821CS its
+# stock dtb names, and this kernel has no driver for it: build Realtek's
+# vendor driver out of tree, pinned, as a module in the cached kernel output.
+RTL8733BS_REPO=https://github.com/newbie-461/RTL8733BS_WiFi_linux_v5.14.1.1-46.git
+RTL8733BS_COMMIT=4719bf994bc4a80c05cda4cb397ee7a39ecebe15
+RTL8733BS_PATCHES=()
 if [ "$UNIT" = "e5plus" ]; then
   E5PLUS_DTS="patches/e5plus/kernel/rk3566-e5plus.dts"
   E5PLUS_PATCHES=(patches/e5plus/kernel/*.patch)
+  RTL8733BS_PATCHES=(patches/e5plus/rtl8733bs/*.patch)
 fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
     "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" "${RGB30_TF2:-}" \
     ${E5PLUS_DTS:+"$E5PLUS_DTS"} "${E5PLUS_PATCHES[@]}" \
+    ${RTL8733BS_PATCHES[0]:+"$RTL8733BS_COMMIT"} "${RTL8733BS_PATCHES[@]}" \
     "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png" \
     scripts/kernel/*.patch \
     "fmt2")"
@@ -147,6 +155,25 @@ cd ..
 if [ "$KERNEL_FROM_CACHE" != "y" ]; then
   sudo make -C $KERNEL_SRC ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../Arkbuild modules_install
   sudo cp -Rv $KERNEL_SRC/lib/firmware/ Arkbuild/usr/lib/
+
+  if [ "$UNIT" = "e5plus" ]; then
+    (
+      set -e
+      rm -rf rtl8733bs
+      git clone -q "$RTL8733BS_REPO" rtl8733bs
+      git -C rtl8733bs checkout -q "$RTL8733BS_COMMIT"
+      for patch in "${RTL8733BS_PATCHES[@]}"; do git -C rtl8733bs apply "$PWD/$patch"; done
+      make -C $KERNEL_SRC M="$PWD/rtl8733bs" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+        KCFLAGS=-w CONFIG_RTL8733BS=m -j$(nproc) modules
+      KVER="$(basename "$(ls -d Arkbuild/lib/modules/*/ | head -1)")"
+      sudo install -D -m 0644 rtl8733bs/8733bs.ko "Arkbuild/lib/modules/$KVER/extra/8733bs.ko"
+    )
+    if ! ls Arkbuild/lib/modules/*/extra/8733bs.ko >/dev/null 2>&1; then
+      echo "ERROR: the RTL8733BS driver did not build - the E5 Plus would have no Wi-Fi."
+      exit 1
+    fi
+    rm -rf rtl8733bs
+  fi
 
   echo "Packing the kernel for the build cache..."
   if sudo tar --zstd -cf kernel-cache.tar.zst \
