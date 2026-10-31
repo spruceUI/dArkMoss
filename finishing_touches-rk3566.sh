@@ -245,6 +245,16 @@ if [[ "$UNIT" == "miniloong" ]]; then
   sudo chroot Arkbuild/ bash -c "systemctl enable miniloong_led"
 fi
 
+# For GameMT E5 Plus Units Only. The stick light rings and button backlights:
+# a helper the spruce port scripts (scripts/e5plus/ports) call, and a unit that
+# reapplies the saved choice at boot.
+if [[ "$UNIT" == "e5plus" ]]; then
+  sudo cp scripts/e5plus/e5plus-lights.sh Arkbuild/usr/local/bin/e5plus-lights.sh
+  sudo chmod 755 Arkbuild/usr/local/bin/e5plus-lights.sh
+  sudo cp scripts/e5plus/e5plus-lights.service Arkbuild/etc/systemd/system/e5plus-lights.service
+  sudo chroot Arkbuild/ bash -c "systemctl enable e5plus-lights"
+fi
+
 # For RGB30 Units Only.  Check for v1 or v2 units and change dtbs due to performance issues.
 # Also provide some battery life status indication
 if [[ "$UNIT" == "rgb30" ]]; then
