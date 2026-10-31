@@ -1,5 +1,6 @@
 #!/bin/sh
-# GameMT E5 Plus lights: the rings round both sticks and the two button
+# GameMT E5 Plus lights (driven by the spruce Joystick Lights app): the rings
+# round both sticks and the two button
 # backlights (led3, workled), all plain gpio-leds from the e5plus dts.
 #
 #   e5plus-lights.sh on | sticks-off | off   set a mode and remember it

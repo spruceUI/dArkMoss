@@ -246,7 +246,7 @@ if [[ "$UNIT" == "miniloong" ]]; then
 fi
 
 # For GameMT E5 Plus Units Only. The stick light rings and button backlights:
-# a helper the spruce port scripts (scripts/e5plus/ports) call, and a unit that
+# a helper the spruce Joystick Lights app (scripts/e5plus/app) calls, and a unit that
 # reapplies the saved choice at boot.
 if [[ "$UNIT" == "e5plus" ]]; then
   sudo cp scripts/e5plus/e5plus-lights.sh Arkbuild/usr/local/bin/e5plus-lights.sh
