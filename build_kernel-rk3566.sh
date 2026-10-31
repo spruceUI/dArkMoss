@@ -274,6 +274,21 @@ if [[ "$UNIT" == "503" ]] || [[ "$UNIT" == *"353"* ]] || [[ "$UNIT" == *"miniloo
   cd ../..
   rm -rf rkbin
   #scripts/mkimg --dtb ${UNIT_DTB}.dtb
+elif [[ "$UNIT" == "e5plus" ]]; then
+  # The E5 Plus gets its own resource.img: U-Boot reads rk-kernel.dtb from it
+  # (charge animation, PMIC, display). The RG503 one below describes another
+  # board: its charge mode parked a reboot-with-USB in a charge screen this
+  # panel cannot show, and its "LCD power" GPIO0_C2 is the left stick light
+  # here. The e5plus dts sets uboot-charge-on = <0>, as stock. dtb only: no
+  # off-charging bitmaps without charge mode, and no logo (a cached kernel
+  # tree carries no logo.bmp).
+  git clone --depth=1 https://github.com/rockchip-linux/rkbin
+  cd rkbin/tools
+  cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb rk-kernel.dtb
+  ./resource_tool --pack rk-kernel.dtb
+  cp resource.img ../../.
+  cd ../..
+  rm -rf rkbin
 else
   # For some reason, supported PowKiddy rk3566 devices need resource.img
   # generated from the RG503 Kernel source.

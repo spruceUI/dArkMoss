@@ -78,11 +78,18 @@
 		default-brightness-level = <200>;
 	};
 
+	/*
+	 * Read by U-Boot only (this dtb is also the e5plus resource.img's
+	 * rk-kernel.dtb). Charge mode OFF, as on the stock E5 Plus: with it on,
+	 * a reboot with USB connected resets the PMIC, U-Boot takes the restart
+	 * for a charger plug-in and parks in a charge screen this board cannot
+	 * show, and the power key does not get it out.
+	 */
 	charge-animation {
 		compatible = "rockchip,uboot-charge";
-		rockchip,uboot-charge-on = <1>;
+		rockchip,uboot-charge-on = <0>;
 		rockchip,android-charge-on = <0>;
-		rockchip,uboot-low-power-voltage = <3450>;
+		rockchip,uboot-low-power-voltage = <3350>;
 		rockchip,screen-on-voltage = <3400>;
 		status = "okay";
 	};
