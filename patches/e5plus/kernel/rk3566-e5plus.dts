@@ -969,12 +969,16 @@
 			virtual_power = <0>;
 		};
 
-		/* The IP2315 front end reports DC-in on GPIO3_B5. */
+		/*
+		 * No dc_det_gpio. Stock wires GPIO3_B5 (the IP2315 detect line)
+		 * as DC-in, but on hardware it reads "DC present" with nothing
+		 * plugged in, so the ac supply stayed online and the battery
+		 * reported Charging from boot until a plug/unplug edge. The
+		 * rk817's own VBUS/BC1.2 detection reads the port correctly
+		 * (plugin=0 at boot, plugin=1 sdp=1 on a PC), as on the RGB30.
+		 */
 		charger {
 			compatible = "rk817,charger";
-			dc_det_gpio = <&gpio3 RK_PB5 GPIO_ACTIVE_LOW>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&ip2315_det_pin>;
 			min_input_voltage = <4500>;
 			max_input_current = <2000>;
 			max_chrg_current = <2000>;
@@ -1309,12 +1313,6 @@
 		};
 		lcd0_en_gpio: lcd0-en-gpio {
 			rockchip,pins = <0 RK_PC7 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-
-	charger {
-		ip2315_det_pin: ip2315-det-pin {
-			rockchip,pins = <3 RK_PB5 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 
