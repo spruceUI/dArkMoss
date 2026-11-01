@@ -1095,8 +1095,13 @@
 	pinctrl-0 = <&uart1m0_xfer &uart1m0_ctsn &uart1m0_rtsn>;
 	uart-has-rtscts;
 
+	/*
+	 * The RTL8733BS's Bluetooth half, an RTL8723F core on H5 (3-wire UART).
+	 * hci_h5 binds the rtl8822cs-bt fallback; btrtl picks the chip by its
+	 * version (0004) and loads rtl_bt/rtl8723fs_fw.bin + _config.bin.
+	 */
 	bluetooth {
-		compatible = "realtek,rtl8821cs-bt", "realtek,rtl8822cs-bt";
+		compatible = "realtek,rtl8723fs-bt", "realtek,rtl8822cs-bt";
 		enable-gpios = <&gpio0 RK_PC1 GPIO_ACTIVE_HIGH>;
 		device-wake-gpios = <&gpio0 RK_PB6 GPIO_ACTIVE_HIGH>;
 		host-wake-gpios = <&gpio0 RK_PB5 GPIO_ACTIVE_HIGH>;

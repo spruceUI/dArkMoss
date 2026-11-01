@@ -220,7 +220,12 @@ sudo mkdir -p Arkbuild/lib/firmware/
 # Use rsync to handle symlinks gracefully
 sudo rsync -aL --ignore-errors $KERNEL_SRC/lib/firmware/ Arkbuild/lib/firmware/ 2>/dev/null || \
  sudo cp -rL $KERNEL_SRC/lib/firmware/* Arkbuild/lib/firmware/ 2>/dev/null || true
- 
+if [ "$UNIT" = "e5plus" ]; then
+  # Also in the initrd (below), for btrtl's first attempt early in boot.
+  sudo install -D -m 0644 -t Arkbuild/usr/lib/firmware/rtl_bt/ \
+    firmware/rtl8723fs/rtl8723fs_fw.bin firmware/rtl8723fs/rtl8723fs_config.bin
+fi
+
 # Create uInitrd from generated initramfs
 #sudo cp /usr/bin/qemu-aarch64-static Arkbuild/usr/bin/
 KERNEL_VERSION=$(basename $(find Arkbuild/lib/modules -maxdepth 1 -mindepth 1 -type d))
@@ -263,7 +268,10 @@ done
 # We also need to copy the 5.10 kernel compatible BT firmware files or BT will not initialize correctly
 mkdir -p lib/firmware/rtl_bt/
 # The RGB30 image gets both: the RGB20SX boots it with an RTL8723DS.
-if [[ "$UNIT" != "rgb20pro" ]] && [[ "$UNIT" != *"miniloong"* ]]; then
+if [[ "$UNIT" == "e5plus" ]]; then
+  # RTL8733BS: its Bluetooth core is an RTL8723F (0004 teaches btrtl about it).
+  sudo cp ../firmware/rtl8723fs/rtl8723fs_fw.bin ../firmware/rtl8723fs/rtl8723fs_config.bin lib/firmware/rtl_bt/
+elif [[ "$UNIT" != "rgb20pro" ]] && [[ "$UNIT" != *"miniloong"* ]]; then
   sudo cp ../Arkbuild/usr/lib/firmware/rtl_bt/rtl8821cs_* lib/firmware/rtl_bt/
 fi
 if [[ "$UNIT" == "rgb20pro" ]] || [[ "$UNIT" == *"miniloong"* ]] || [[ "$UNIT" == "rgb30" ]]; then
