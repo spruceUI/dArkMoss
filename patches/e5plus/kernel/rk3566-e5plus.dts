@@ -186,8 +186,15 @@
 			3300000 0x1>;
 	};
 
-	/* Volume and three legacy entries on the saradc ladder, as on stock. */
+	/*
+	 * The stock volume ladder on saradc ch0. Disabled: on hardware ch0
+	 * reads ~0 V whether or not a key is held (the same under the stock
+	 * JELOS), so the driver reports VOLUMEUP held for good and re-reports
+	 * it on every resume, bumping the volume after each sleep. spruce
+	 * uses SELECT + L3/R3 for volume on this unit instead.
+	 */
 	adc_keys: adc-keys {
+		status = "disabled";
 		compatible = "adc-keys";
 		io-channels = <&saradc 0>;
 		io-channel-names = "buttons";
