@@ -76,8 +76,12 @@ sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/loca
 # Set performance governor to ondemand on boot
 sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/perfnorm quiet &\") | crontab -"
 
-# Check for connected headphones on boot
-sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/headphone-audio-switch.sh &\") | crontab -"
+# Check for connected headphones on boot. Not on the E5 Plus: it reads a
+# rk_headset debug message this kernel does not print, so it always picked SPK;
+# e5plus-audio-path.sh (below) follows the jack instead.
+if [[ "$UNIT" != "e5plus" ]]; then
+  sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/headphone-audio-switch.sh &\") | crontab -"
+fi
 
 # Find and record panel id on boot (for rg353 devices only)
 if [[ "$UNIT" == *"353"* ]]; then
@@ -253,6 +257,11 @@ if [[ "$UNIT" == "e5plus" ]]; then
   sudo chmod 755 Arkbuild/usr/local/bin/e5plus-lights.sh
   sudo cp scripts/e5plus/e5plus-lights.service Arkbuild/etc/systemd/system/e5plus-lights.service
   sudo chroot Arkbuild/ bash -c "systemctl enable e5plus-lights"
+  # Speaker or headphones, following the jack (udev on every rk-headset extcon
+  # change; at boot from the spktoggle cron line below).
+  sudo cp scripts/e5plus/e5plus-audio-path.sh Arkbuild/usr/local/bin/e5plus-audio-path.sh
+  sudo chmod 755 Arkbuild/usr/local/bin/e5plus-audio-path.sh
+  sudo cp scripts/e5plus/99-e5plus-headphones.rules Arkbuild/etc/udev/rules.d/99-e5plus-headphones.rules
 fi
 
 # For RGB30 Units Only.  Check for v1 or v2 units and change dtbs due to performance issues.
@@ -281,7 +290,11 @@ fi
 sudo mkdir -p Arkbuild/usr/local/bin
 sudo cp scripts/spktoggle.sh Arkbuild/usr/local/bin/
 sudo chmod 777 Arkbuild/usr/local/bin/spktoggle.sh
-if [[ "$UNIT" != "rgb20pro" ]]; then
+if [[ "$UNIT" == "e5plus" ]]; then
+  # spktoggle.sh restores the saved mixer and leaves Playback Path at SPK_HP,
+  # which plays the speaker with headphones in; set the real path after it.
+  sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot (/usr/local/bin/spktoggle.sh; /usr/local/bin/e5plus-audio-path.sh) &\") | crontab -"
+elif [[ "$UNIT" != "rgb20pro" ]]; then
   sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/spktoggle.sh &\") | crontab -"
 else
   sudo sed -i "/\#\!\/bin\/bash/c\\#\!\/bin\/bash\namixer -q sset \'Playback Path\' HP" ${mountpoint}/firstboot.sh

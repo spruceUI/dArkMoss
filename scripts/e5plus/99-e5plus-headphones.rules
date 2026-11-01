@@ -1,0 +1,2 @@
+# GameMT E5 Plus: follow the headphone jack (see e5plus-audio-path.sh).
+SUBSYSTEM=="extcon", ACTION=="change", RUN+="/usr/local/bin/e5plus-audio-path.sh"
