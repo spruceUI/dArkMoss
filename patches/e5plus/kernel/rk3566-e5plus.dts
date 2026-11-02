@@ -80,17 +80,15 @@
 
 	/*
 	 * Read by U-Boot only (this dtb is also the e5plus resource.img's
-	 * rk-kernel.dtb). Off-charging in U-Boot, as on the other rk3566 units
-	 * (stock Android left it to its own charger mode): a charger plugged
-	 * into the switched-off device shows the battery (resource.img's
-	 * battery_*.bmp, turned for this portrait panel) instead of booting.
-	 * Long-press power boots, a short press toggles the screen, unplugging
-	 * powers off. It only runs on a cold start: a reboot leaves "normal"
-	 * in the boot-mode register (reboot-mode) and U-Boot skips it.
+	 * rk-kernel.dtb). Charge mode off: with it on, a charger plugged into
+	 * the switched-off device still booted all the way (tried; U-Boot logs
+	 * only to a serial port, so the failing check is unknown). The charging
+	 * screen is done in Linux instead: e5plus-offcharge reads the PMIC's
+	 * power-on source and holds the boot on a charger plug-in.
 	 */
 	charge-animation {
 		compatible = "rockchip,uboot-charge";
-		rockchip,uboot-charge-on = <1>;
+		rockchip,uboot-charge-on = <0>;
 		rockchip,android-charge-on = <0>;
 		rockchip,uboot-low-power-voltage = <3350>;
 		rockchip,screen-on-voltage = <3400>;

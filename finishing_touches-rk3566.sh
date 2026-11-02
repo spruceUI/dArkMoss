@@ -263,6 +263,13 @@ if [[ "$UNIT" == "e5plus" ]]; then
   sudo chmod 755 Arkbuild/usr/local/bin/e5plus-audio-path.sh
   sudo cp scripts/e5plus/e5plus-jackd.service Arkbuild/etc/systemd/system/e5plus-jackd.service
   sudo chroot Arkbuild/ bash -c "systemctl enable e5plus-jackd"
+  # Charging screen when a charger switched the device on (U-Boot's charge
+  # mode never engages on this board; see e5plus-offcharge.py).
+  sudo install -D -m 0755 scripts/e5plus/e5plus-offcharge.py Arkbuild/usr/local/bin/e5plus-offcharge.py
+  sudo install -D -m 0644 -t Arkbuild/usr/local/share/e5plus-offcharge/ \
+    misc/rk3566/device_off_charging_bmps/e5plus/battery_*.bmp
+  sudo cp scripts/e5plus/e5plus-offcharge.service Arkbuild/etc/systemd/system/e5plus-offcharge.service
+  sudo chroot Arkbuild/ bash -c "systemctl enable e5plus-offcharge"
 fi
 
 # For RGB30 Units Only.  Check for v1 or v2 units and change dtbs due to performance issues.

@@ -1,0 +1,15 @@
+[Unit]
+Description=E5 Plus charging screen after a charger power-up
+# Runs before the spruce UI takes the display; exits at once on any start
+# that wasn't the charger switching the device on (see the script).
+After=systemd-udev-trigger.service systemd-modules-load.service local-fs.target
+Before=spruce-launch.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/bin/e5plus-offcharge.py
+TimeoutStartSec=infinity
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target
