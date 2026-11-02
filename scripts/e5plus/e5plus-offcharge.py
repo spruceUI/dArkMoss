@@ -29,7 +29,7 @@ import sys
 import time
 
 IMG_DIR = "/usr/local/share/e5plus-offcharge"
-LIGHTS = "/usr/local/bin/e5plus-lights.sh"
+LIGHTS = "/usr/local/bin/e5plus-lights.sh"  # run via sh: an adb push can drop its x bit
 PLUG_IN, PWRON_KEY = 0x40, 0x80
 SCREEN_ON_S = 8
 SCALE = 2  # the 110x220 icons are small on this panel
@@ -207,7 +207,7 @@ def main():
     log("charger power-up (on=0x%02x): charging screen" % src)
 
     run(["plymouth", "quit"])
-    run([LIGHTS, "dark"])  # stick rings and button lights off while charging
+    run(["/bin/sh", LIGHTS, "dark"])  # stick rings and button lights off while charging
     images = []
     for n in range(6):
         try:
@@ -281,7 +281,7 @@ def main():
         run(["systemctl", "poweroff"])
         time.sleep(30)  # keep spruce from starting while systemd shuts down
     else:
-        run([LIGHTS, "restore"])
+        run(["/bin/sh", LIGHTS, "restore"])
         log("power held, continuing the boot")
     return 0
 
