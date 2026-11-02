@@ -49,6 +49,14 @@ def read(path, default=""):
         return default
 
 
+def run(cmd):
+    """Run a helper that may not be installed (plymouth isn't, on dArkMoss)."""
+    try:
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError:
+        pass
+
+
 def power_on_source():
     try:
         out = subprocess.run(["dmesg"], capture_output=True, text=True).stdout
@@ -177,11 +185,11 @@ def main():
         time.sleep(0.5)
     else:
         log("charger power-up but no charger now, powering off")
-        subprocess.run(["systemctl", "poweroff"])
+        run(["systemctl", "poweroff"])
         return 0
     log("charger power-up (on=0x%02x): charging screen" % src)
 
-    subprocess.run(["plymouth", "quit"], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
+    run(["plymouth", "quit"])
     images = []
     for n in range(6):
         try:
@@ -252,7 +260,7 @@ def main():
 
     if result == "off":
         log("charger unplugged, powering off")
-        subprocess.run(["systemctl", "poweroff"])
+        run(["systemctl", "poweroff"])
         time.sleep(30)  # keep spruce from starting while systemd shuts down
     else:
         log("power held, continuing the boot")
