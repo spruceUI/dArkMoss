@@ -6,6 +6,7 @@
 #   e5plus-lights.sh on | sticks-off | off   set a mode and remember it
 #   e5plus-lights.sh cycle                   next mode; prints its name
 #   e5plus-lights.sh restore                 apply the remembered mode (boot)
+#   e5plus-lights.sh dark                    all off, NOT remembered (charging screen)
 #   e5plus-lights.sh status                  print the remembered mode
 STATE=/etc/e5plus-lights
 LEDS=/sys/class/leds
@@ -41,7 +42,8 @@ case "$1" in
         esac
         echo "$_next" > "$STATE"; apply "$_next"; echo "$_next" ;;
     restore) apply "$(current)" ;;
+    dark)    apply off; exit 0 ;;
     status)  current ;;
-    *) echo "usage: $0 on|sticks-off|off|cycle|restore|status" >&2; exit 1 ;;
+    *) echo "usage: $0 on|sticks-off|off|cycle|restore|dark|status" >&2; exit 1 ;;
 esac
 sync

@@ -11,7 +11,9 @@ On a charger power-up, with the charger still in:
     portrait panel) and blank the backlight after a few seconds;
   - a short press of power shows it again, holding power (1.5 s) carries on
     into spruce;
-  - unplugging the charger powers the device off.
+  - unplugging the charger powers the device off;
+  - the stick rings and button lights stay dark meanwhile (not saved as the
+    Joystick Lights setting, which is put back on the way into spruce).
 Anything else (power-key start, reboot, no log line) exits at once and the
 boot goes on as usual.
 """
@@ -27,6 +29,7 @@ import sys
 import time
 
 IMG_DIR = "/usr/local/share/e5plus-offcharge"
+LIGHTS = "/usr/local/bin/e5plus-lights.sh"
 PLUG_IN, PWRON_KEY = 0x40, 0x80
 SCREEN_ON_S = 8
 SCALE = 2  # the 110x220 icons are small on this panel
@@ -204,6 +207,7 @@ def main():
     log("charger power-up (on=0x%02x): charging screen" % src)
 
     run(["plymouth", "quit"])
+    run([LIGHTS, "dark"])  # stick rings and button lights off while charging
     images = []
     for n in range(6):
         try:
@@ -277,6 +281,7 @@ def main():
         run(["systemctl", "poweroff"])
         time.sleep(30)  # keep spruce from starting while systemd shuts down
     else:
+        run([LIGHTS, "restore"])
         log("power held, continuing the boot")
     return 0
 
