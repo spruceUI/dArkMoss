@@ -30,6 +30,8 @@ IMG_DIR = "/usr/local/share/e5plus-offcharge"
 PLUG_IN, PWRON_KEY = 0x40, 0x80
 SCREEN_ON_S = 8
 SCALE = 2  # the 110x220 icons are small on this panel
+# BGRA: the alpha byte matters, a 0 shows whatever plane is beneath.
+BLACK = b"\x00\x00\x00\xff"
 HOLD_TO_BOOT_S = 1.5
 POLL_S = 0.5
 EV_KEY, KEY_POWER = 1, 116
@@ -125,7 +127,18 @@ class Screen:
         if bpp != 32 or not w:
             log("framebuffer %sx%s %sbpp not supported, no picture" % (w, h, bpp))
             return
-        self.w, self.h, self.stride = w, h, stride
+        # The buffer is double height (page flipping): centre on the visible
+        # mode, on the page the display is panned to.
+        vw, vh = w, h
+        m = re.search(r"(\d+)x(\d+)", read("/sys/class/graphics/fb0/modes"))
+        if m:
+            vw, vh = min(w, int(m.group(1))), min(h, int(m.group(2)))
+        try:
+            px, py = (int(v) for v in read("/sys/class/graphics/fb0/pan", "0,0").split(","))
+        except ValueError:
+            px, py = 0, 0
+        self.w, self.h, self.stride = vw, vh, stride
+        self.ox, self.oy = px, py
         fd = os.open("/dev/fb0", os.O_RDWR)
         self.fb = mmap.mmap(fd, stride * h)
         os.close(fd)
@@ -142,9 +155,10 @@ class Screen:
     def show(self, bmp):
         if not self.fb:
             return
-        self.fb[:] = b"\x00" * len(self.fb)
+        self.fb[:] = BLACK * (len(self.fb) // 4)
         w, h, rows = bmp
-        x0, y0 = (self.w - w) // 2, (self.h - h) // 2
+        x0 = self.ox + (self.w - w) // 2
+        y0 = self.oy + (self.h - h) // 2
         for y, row in enumerate(rows):
             o = (y0 + y) * self.stride + x0 * 4
             self.fb[o:o + len(row)] = row
@@ -160,7 +174,7 @@ class Screen:
     def close(self):
         self.backlight(True)
         if self.fb:
-            self.fb[:] = b"\x00" * len(self.fb)
+            self.fb[:] = BLACK * (len(self.fb) // 4)
             self.fb.close()
         if self.tty is not None:
             try:
