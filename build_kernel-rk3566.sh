@@ -314,13 +314,14 @@ elif [[ "$UNIT" == "e5plus" ]]; then
   # (charge animation, PMIC, display). The RG503 one below describes another
   # board: its charge mode parked a reboot-with-USB in a charge screen this
   # panel cannot show, and its "LCD power" GPIO0_C2 is the left stick light
-  # here. The e5plus dts sets uboot-charge-on = <0>, as stock. dtb only: no
-  # off-charging bitmaps without charge mode, and no logo (a cached kernel
-  # tree carries no logo.bmp).
+  # here. Off-charging bitmaps: the RG503 set turned 90 degrees clockwise for
+  # this portrait panel (see the dts charge-animation node). No logo: a
+  # cached kernel tree carries no logo.bmp.
   git clone --depth=1 https://github.com/rockchip-linux/rkbin
   cd rkbin/tools
+  cp ../../../misc/rk3566/device_off_charging_bmps/e5plus/*.bmp .
   cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb rk-kernel.dtb
-  ./resource_tool --pack rk-kernel.dtb
+  ./resource_tool --pack *.bmp rk-kernel.dtb
   cp resource.img ../../.
   cd ../..
   rm -rf rkbin

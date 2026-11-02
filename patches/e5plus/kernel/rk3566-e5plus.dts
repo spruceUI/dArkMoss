@@ -80,14 +80,17 @@
 
 	/*
 	 * Read by U-Boot only (this dtb is also the e5plus resource.img's
-	 * rk-kernel.dtb). Charge mode OFF, as on the stock E5 Plus: with it on,
-	 * a reboot with USB connected resets the PMIC, U-Boot takes the restart
-	 * for a charger plug-in and parks in a charge screen this board cannot
-	 * show, and the power key does not get it out.
+	 * rk-kernel.dtb). Off-charging in U-Boot, as on the other rk3566 units
+	 * (stock Android left it to its own charger mode): a charger plugged
+	 * into the switched-off device shows the battery (resource.img's
+	 * battery_*.bmp, turned for this portrait panel) instead of booting.
+	 * Long-press power boots, a short press toggles the screen, unplugging
+	 * powers off. It only runs on a cold start: a reboot leaves "normal"
+	 * in the boot-mode register (reboot-mode) and U-Boot skips it.
 	 */
 	charge-animation {
 		compatible = "rockchip,uboot-charge";
-		rockchip,uboot-charge-on = <0>;
+		rockchip,uboot-charge-on = <1>;
 		rockchip,android-charge-on = <0>;
 		rockchip,uboot-low-power-voltage = <3350>;
 		rockchip,screen-on-voltage = <3400>;
