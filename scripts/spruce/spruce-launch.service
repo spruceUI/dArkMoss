@@ -20,6 +20,15 @@ Type=idle
 #
 # The frontend's children legitimately outlive it during shutdown, so process
 # is the honest mode here.
+#
+# The same stop has a second effect: TTYVHangup=yes hangs up tty1 when the unit
+# deactivates, and that SIGHUPs every process still on it - the running game
+# included. save_poweroff.sh kills runtime.sh BEFORE it asks the emulator to
+# close, so a game held on this tty was killed outright and never wrote its
+# auto-save state: power-off resumed the game from an older state, while the
+# Game Switcher (which does not stop this unit) saved fine. ExecStart below
+# therefore ignores SIGHUP before it execs runtime.sh; an ignored signal stays
+# ignored across exec, so every game and app spruce starts inherits it.
 KillMode=process
 ExecStartPre=/usr/local/sbin/mount-spruce.sh
 # Detach fbcon from the panel so the console cannot show through during the
@@ -42,7 +51,7 @@ ExecStartPre=-/usr/local/sbin/console-blank.sh
 # flag, runtime.sh runs normally and its output goes to the journal below. exec
 # keeps runtime.sh as the unit's MainPID in both branches, which the
 # KillMode=process shutdown path above depends on.
-ExecStart=/bin/sh -lc 'if [ -e /boot/darkmoss-debug ]; then exec /mnt/SDCARD/spruce/scripts/runtime.sh >/dev/tty1 2>&1; else exec /mnt/SDCARD/spruce/scripts/runtime.sh; fi'
+ExecStart=/bin/sh -lc 'trap "" HUP; if [ -e /boot/darkmoss-debug ]; then exec /mnt/SDCARD/spruce/scripts/runtime.sh >/dev/tty1 2>&1; else exec /mnt/SDCARD/spruce/scripts/runtime.sh; fi'
 Restart=on-failure
 RestartSec=3
 StandardInput=tty
