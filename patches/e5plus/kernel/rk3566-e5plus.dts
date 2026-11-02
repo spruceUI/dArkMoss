@@ -1019,7 +1019,13 @@
 			pinctrl-names = "default";
 			pinctrl-0 = <&i2s1m0_mclk>;
 			hp-volume = <3>;
-			spk-volume = <3>;
+			/*
+			 * DAC attenuation (0.375 dB steps) the codec loads on every
+			 * switch to the speaker. At 3 (-1.1 dB) spruce's top volume
+			 * clipped the speaker; 20 (-7.5 dB) measured on hardware as
+			 * loud with no audible distortion.
+			 */
+			spk-volume = <20>;
 			out-l2spk-r2hp;
 			spk-ctl-gpios = <&gpio4 RK_PC2 GPIO_ACTIVE_HIGH>;
 			status = "okay";
