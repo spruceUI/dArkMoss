@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
-# Host test for charge-mode.sh and its initramfs hook (Twig-Next's charge-mode test, adapted) under
+# Host test for charge-mode.sh, its initramfs hook and init-charge (Twig-Next's charge-mode test, adapted) under
 # busybox ash in bwrap: fake /sys, FIFO key nodes, a file for fb0 and a gunzip stub that logs what
 # is drawn. Needs bwrap + busybox on a Linux host.
 #   test/run.sh [quick]   quick skips the blank/wake case (about 65 s)
@@ -9,6 +9,7 @@ HERE="$(cd "$(dirname "$0")/.." && pwd)"
 T="$(mktemp -d)"; trap 'kill $(jobs -p) 2>/dev/null; rm -rf "$T"' EXIT
 # frozen copies: ash reads scripts as it runs
 cp "$HERE/charge-mode.sh" "$T/charge-mode.sh"; cp "$HERE/darkmoss-charge" "$T/darkmoss-charge"
+cp "$HERE/init-charge" "$T/init-charge"
 fails=0
 ok() { echo "ok   $*"; }
 bad() { echo "FAIL $*"; fails=$((fails + 1)); }
@@ -64,8 +65,9 @@ ev() { printf "$(printf '\\x%02x' 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 $(($2 & 255)) 
   $(($3 & 255)) $(($3 >> 8)) $(($4 & 255)) 0 0 0)" >&"$1"; }
 press() { ev "$1" 1 "$2" 1; ev "$1" 0 0 0; ev "$1" 1 "$2" 0; ev "$1" 0 0 0; }
 
+ENV=()   # extra --setenv pairs for the next start
 start() {
-  bwrap --unshare-all --die-with-parent --new-session \
+  bwrap --unshare-all --die-with-parent --new-session "${ENV[@]}" \
     --ro-bind /usr/lib /usr/lib --symlink usr/lib /lib --ro-bind /usr/bin/busybox /usr/bin/busybox \
     --proc /proc --dev /dev --tmpfs /tmp \
     --bind "$T/root/sys" /sys --bind "$T/root/devinput" /dev/input --bind "$T/root/storage" /storage \
@@ -187,6 +189,59 @@ hook 2
 hook 0; [ "$HRC" = 0 ] && [ "$CALLS" = "args /root/usr/local/share/darkmoss-charge log /root/var/log/darkmoss-charge.log|" ] \
   && ok "hook: exit 0 -> boot on" || bad "hook exit 0: rc $HRC, $CALLS"
 hook none; [ "$HRC" = 0 ] && [ -z "$CALLS" ] && ok "hook: no charge-mode.sh -> boot on" || bad "hook none: rc $HRC, $CALLS"
+
+# 8: a unit with two panels: the set for fb0's width (w<width>/), not another width's.
+setup; mkdir frames/w4 frames/w9; mv frames/*.gz frames/fb frames/w4/; cp frames/w4/* frames/w9/
+start; sleep 2
+press 3 116; waitrc 20; finish
+[ "$(head -1 storage/draw.log)" = "-c /frames/w4/level-040.raw.gz" ] && [ "$(tail -1 storage/draw.log)" = "-c /frames/w4/booting.raw.gz" ] \
+  && ok "two panels: fb0's width picks w4/" || bad "two panels: $(tr '\n' ' ' < storage/draw.log)"
+setup; mkdir frames/w9; mv frames/*.gz frames/fb frames/w9/
+start; waitrc 20; finish
+[ "$RC" = 0 ] && [ ! -s storage/draw.log ] && grep -q "no frames for fb0" storage/charge.log \
+  && ok "two panels, neither this width -> boot, nothing drawn" || bad "w9 only: rc $RC, $(cat storage/charge.log)"
+
+# 9: no power key after 5 s: boot (nothing else could), the boot logo drawn, console given back.
+setup; echo "rk817 charger" > sys/class/input/event0/device/name; echo 0 > sys/class/input/event0/device/capabilities/key
+start; waitrc 40; finish
+[ "$RC" = 0 ] && grep -q "no power key; booting" storage/charge.log && [ "$(tail -1 storage/draw.log)" = "-c /frames/booting.raw.gz" ] \
+  && [ "$(S storage/vt.log | tr '\n' ' ')" = "2 1 " ] && [ "$(S storage/printk)" = 7 ] \
+  && ok "no power key -> boot logo, exit 0, console back" || bad "no power key: rc $RC, $(tail -1 storage/charge.log)"
+
+# 10: CHARGE_MODE_TMP holds the key readers' files, removed on the way out.
+setup; mkdir storage/run; ENV=(--setenv CHARGE_MODE_TMP /storage/run); start; sleep 2
+[ -e storage/run/charge-pek ] && [ -e storage/run/charge-pad ] && ok "readers' files in CHARGE_MODE_TMP" || bad "run: $(ls storage/run)"
+press 3 116; waitrc 20; finish; ENV=()
+[ "$RC" = 0 ] && [ -z "$(ls storage/run)" ] && ok "and removed on boot" || bad "rc $RC, left $(ls storage/run)"
+
+# 11: init-charge (no initramfs): mounts what is missing, runs charge-mode.sh with busybox's applets
+# first, unmounts and execs /sbin/init with the kernel's arguments; exit 2 powers off.
+initc() {   # initc RC: init-charge with a charge-mode.sh stub that exits RC (none: no stub)
+  rm -rf "$T/ic"; mkdir -p "$T/ic/r/usr/local/lib/darkmoss-charge" "$T/ic/r/sbin" "$T/ic/r/run" "$T/ic/r/proc" \
+    "$T/ic/r/sys" "$T/ic/out"
+  [ "$1" = none ] || printf '#!/bin/sh\necho "args $* tmp $CHARGE_MODE_TMP log $CHARGE_MODE_LOG devmem $(command -v devmem)" >> /out/calls\nexit %s\n' "$1" \
+    > "$T/ic/r/usr/local/lib/darkmoss-charge/charge-mode.sh"
+  printf '#!/usr/bin/busybox sh\necho "init $*" >> /out/calls\n' > "$T/ic/r/sbin/init"
+  # busybox, but mount, umount, sync and poweroff only logged, and nothing mounted yet
+  printf '#!/usr/bin/busybox sh\ncase "$1" in mount|umount|sync|poweroff) echo "$*" >> /out/calls; exit 0 ;; mountpoint) exit 1 ;; esac\nexec /usr/bin/busybox "$@"\n' \
+    > "$T/ic/bb"
+  chmod +x "$T/ic/bb" "$T/ic/r/sbin/init"
+  bwrap --unshare-all --die-with-parent --ro-bind /usr/lib /usr/lib --symlink usr/lib /lib \
+    --ro-bind /usr/bin/busybox /usr/bin/busybox --proc /proc --dev /dev \
+    --bind "$T/ic/r" /r --bind "$T/ic/out" /out --ro-bind "$T/ic/bb" /bb --ro-bind "$T/init-charge" /init-charge \
+    --setenv CHARGE_MODE_ROOT /r --setenv CHARGE_MODE_BUSYBOX /bb /usr/bin/busybox sh /init-charge quiet splash > /dev/null
+  IRC=$?; CALLS=$(tr '\n' '|' 2>/dev/null < "$T/ic/out/calls")
+}
+M="mount -t proc proc /r/proc|mount -t sysfs sysfs /r/sys|mount -t tmpfs tmpfs /r/run|"
+A="args /r/usr/local/share/darkmoss-charge tmp /r/run/darkmoss-charge log /r/var/log/darkmoss-charge.log devmem /r/run/darkmoss-charge/bin/devmem|"
+initc 0
+[ "$IRC" = 0 ] && [ "$CALLS" = "$M${A}umount /r/run|umount /r/sys|umount /r/proc|init quiet splash|" ] && [ ! -e "$T/ic/r/run/darkmoss-charge" ] \
+  && ok "init-charge: exit 0 -> unmount, exec /sbin/init with its arguments" || bad "init-charge 0: rc $IRC, $CALLS"
+initc 2
+case "$CALLS" in "$M${A}sync|mount -o remount,ro /r/|poweroff -f|"*) ok "init-charge: exit 2 -> sync, root read-only, poweroff -f" ;;
+  *) bad "init-charge 2: $CALLS" ;; esac
+initc none
+[ "$IRC" = 0 ] && [ "$CALLS" = "init quiet splash|" ] && ok "init-charge: no charge-mode.sh -> straight to /sbin/init" || bad "init-charge none: rc $IRC, $CALLS"
 
 # 5: dark after 30 s; the joypad with sticks does not wake it, a pad press does; the power key
 # while dark only wakes; power then boots.

@@ -1,0 +1,32 @@
+#!/bin/busybox sh
+# SPDX-License-Identifier: GPL-2.0
+# The charge screen on a unit that boots with no initramfs (V10): boot.ini's init= runs this as PID 1
+# with the root mounted rw and /dev from devtmpfs; it runs charge-mode.sh as the initramfs hook does
+# (darkmoss-charge), unmounts what it mounted and hands over to /sbin/init. Exit 2 powers off.
+# CHARGE_MODE_ROOT (tests only) puts every path under another root.
+R=${CHARGE_MODE_ROOT:-}
+BB=${CHARGE_MODE_BUSYBOX:-/bin/busybox}
+CM=$R/usr/local/lib/darkmoss-charge/charge-mode.sh
+
+mounted=""
+mnt() {   # mnt TYPE DIR: mount unless something is there already
+    $BB mountpoint -q "$R$2" && return 0
+    $BB mount -t "$1" "$1" "$R$2" && mounted="$R$2 $mounted"
+}
+
+if [ -f "$CM" ]; then
+    mnt proc /proc; mnt sysfs /sys; mnt tmpfs /run
+    # charge-mode.sh is written for the initramfs's busybox: its applets, first on the PATH.
+    $BB mkdir -p "$R/run/darkmoss-charge/bin" && $BB --install -s "$R/run/darkmoss-charge/bin"
+    PATH=$R/run/darkmoss-charge/bin:/usr/sbin:/usr/bin:/sbin:/bin CHARGE_MODE_TMP=$R/run/darkmoss-charge \
+        CHARGE_MODE_LOG=$R/var/log/darkmoss-charge.log $BB sh "$CM" "$R/usr/local/share/darkmoss-charge"
+    if [ $? -eq 2 ]; then
+        echo "Charger removed: powering off"
+        $BB sync
+        $BB mount -o remount,ro "$R/" 2>/dev/null
+        $BB poweroff -f
+    fi
+    $BB rm -rf "$R/run/darkmoss-charge"
+    for m in $mounted; do $BB umount "$m" 2>/dev/null; done
+fi
+exec $R/sbin/init "$@"

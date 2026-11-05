@@ -1,8 +1,9 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0
 # Charge screen (the oakMOSS model), ported from Twig-Next's (spruceUI/twigUI-next,
-# projects/twigUI/devices/RK3326S/packages/charge-mode). The initramfs runs it (local-bottom/darkmoss-charge)
-# with busybox only: battery level, dark after 30 s, any key wakes, power boots.
+# projects/twigUI/devices/RK3326S/packages/charge-mode). The initramfs runs it (local-bottom/darkmoss-charge;
+# init-charge before systemd on units with no initramfs) with busybox only: battery level, dark after 30 s,
+# any key wakes, power boots.
 #   charge-mode.sh [FRAMES-DIR]   (default /root/usr/local/share/darkmoss-charge)
 #   exit 0: not a charger power-on, or power key while lit: carry on booting
 #   exit 2: charger gone for 3 s, power off (the caller unmounts and powers off)
@@ -63,7 +64,10 @@ level_frame() {
     printf '%s/level-%03d.raw.gz' "$FRAMES" "$c"
 }
 
-# The frames are fb0's own bytes at its size (make-frames.py), written at the panned offset.
+# The frames are fb0's own bytes at its size (make-frames.py), written at the panned offset. A unit
+# with two panels has one set per fb0 width (w<width>/).
+_w=$(cut -d, -f1 $FBSYS/virtual_size 2>/dev/null)
+[ -n "$_w" ] && [ -f "$FRAMES/w$_w/fb" ] && FRAMES=$FRAMES/w$_w
 read -r FW _ 2>/dev/null < "$FRAMES/fb"
 STRIDE=$(cat $FBSYS/stride 2>/dev/null)
 show() {
@@ -110,10 +114,19 @@ while :; do
     usleep 250000; n=$((n + 1))
 done
 log "charging at $(level)% (governor $gov -> powersave), power key ${pek:-none}, pads${pads:- none}"
+# Without a power key nothing could boot it but unplugging, which powers off: boot now.
+if [ -z "$pek" ]; then
+    log "no power key; booting"
+    console_back
+    [ -f "$FRAMES/booting.raw.gz" ] && show "$FRAMES/booting.raw.gz"
+    [ -n "$gov" ] && echo "$gov" > "$GOV" 2>/dev/null
+    exit 0
+fi
 
 # A reader per node appends the raw 24-byte input_events to a file, so a press is told from
 # its release and none is missed between ticks.
-PEK_LOG=/tmp/charge-pek; PAD_LOG=/tmp/charge-pad
+TMP=${CHARGE_MODE_TMP:-/tmp}
+PEK_LOG=$TMP/charge-pek; PAD_LOG=$TMP/charge-pad
 : > "$PEK_LOG"; : > "$PAD_LOG"
 pids=""
 [ -n "$pek" ] && { cat "$pek" >> "$PEK_LOG" & pids="$pids $!"; }
