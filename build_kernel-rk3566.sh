@@ -299,6 +299,7 @@ else
     rm -rf charge-rkbin charge-res charge-check
     git clone --depth=1 https://github.com/rockchip-linux/rkbin charge-rkbin
     verify_action
+    echo "charge mode: resource_tool from rockchip-linux/rkbin $(git -C charge-rkbin rev-parse HEAD)"
     mkdir charge-res charge-check
     charge-rkbin/tools/resource_tool --unpack --image=resource.img charge-res
     verify_action

@@ -29,7 +29,8 @@ the charger powers it off. It is oakMOSS's charge screen, ported from Twig-Next'
   `rg351mp-uboot.dtb` (A10 Mini), and in the resource partition's `rk-kernel.dtb` on RK3566 (the
   RGB30's cached RG503 resource is unpacked and repacked for it). The V10 ships no U-Boot dtb, so its
   U-Boot is unchanged. U-Boot's low-battery hold is unchanged everywhere.
-- `test/run.sh`: host test under busybox in bwrap on Linux.
+- `test/run.sh`: host test under busybox in bwrap on Linux. `run.sh install` alone (plain bash) runs
+  install.sh with each CI unit's `export UNIT=` value: unit names here are those (the RG353M's is `353m`).
 
 Wake keys are the power key and every key-only input node. Joypads that also report sticks are not
 read: their axis events are more than the shell can follow.

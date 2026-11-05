@@ -4,6 +4,7 @@
 # busybox ash in bwrap: fake /sys, FIFO key nodes, a file for fb0 and a gunzip stub that logs what
 # is drawn. Needs bwrap + busybox on a Linux host.
 #   test/run.sh [quick]   quick skips the blank/wake case (about 65 s)
+#   test/run.sh install   only case 0 (install.sh per unit; plain bash, no bwrap: runs on macOS too)
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 T="$(mktemp -d)"; trap 'kill $(jobs -p) 2>/dev/null; rm -rf "$T"' EXIT
@@ -13,6 +14,31 @@ cp "$HERE/init-charge" "$T/init-charge"
 fails=0
 ok() { echo "ok   $*"; }
 bad() { echo "FAIL $*"; fails=$((fails + 1)); }
+
+# 0: install.sh with each CI unit's UNIT as its build_<unit>.sh exports it (the RG353M's is 353m):
+# opted in, its frames there, and the right entry (the initramfs hook; init-charge on the V10).
+# sudo only logs; Arkbuild is a stand-in with the busybox the V10 check looks for.
+REPO="$(cd "$HERE/../.." && pwd)"
+mkdir -p "$T/inst/Arkbuild/bin"; ln -s "$REPO/scripts" "$T/inst/scripts"
+printf '#!/bin/sh\n' > "$T/inst/Arkbuild/bin/busybox"; chmod +x "$T/inst/Arkbuild/bin/busybox"
+install_log() { (cd "$T/inst" && UNIT=$1 bash -c 'sudo() { echo "sudo $*"; }; source scripts/charge-mode/install.sh
+  echo "CHARGE_MODE=$CHARGE_MODE"' 2>&1); }
+HOOK="sudo install -D -m 0755 scripts/charge-mode/darkmoss-charge "
+INITC="sudo install -D -m 0755 scripts/charge-mode/init-charge "
+for u in $(cat "$REPO/.github/units.txt"); do
+  unit=$(sed -n 's/^export UNIT=//p' "$REPO/build_$u.sh"); out=$(install_log "$unit"); fr="$REPO/scripts/charge-mode/frames/$unit"
+  { [ -f "$fr/level-100.raw.gz" ] && [ -f "$fr/fb" ]; } || ls "$fr"/w*/fb > /dev/null 2>&1 || out="$out|no frames in $fr"
+  if [ "$unit" = v10 ]; then want="$INITC"; nowant="$HOOK"; else want="$HOOK"; nowant="$INITC"; fi
+  case "$out" in *"no frames in"*) bad "install.sh $u (UNIT=$unit): $out" ;;
+    *) grep -qx "CHARGE_MODE=y" <<< "$out" && grep -qF "sudo cp -r scripts/charge-mode/frames/$unit/. " <<< "$out" &&
+       grep -qF "$want" <<< "$out" && ! grep -qF "$nowant" <<< "$out" \
+       && ok "install.sh $u (UNIT=$unit): opted in, frames/$unit, ${want#*charge-mode/}" || bad "install.sh $u (UNIT=$unit): $(tr '\n' '|' <<< "$out")" ;;
+  esac
+done
+out=$(install_log 353v)
+grep -qx "CHARGE_MODE=n" <<< "$out" && ! grep -q "sudo install\|sudo cp" <<< "$out" \
+  && ok "install.sh: a unit not opted in (353v) installs nothing" || bad "install.sh 353v: $(tr '\n' '|' <<< "$out")"
+if [ "${1:-}" = install ]; then echo "$fails failure(s)"; [ "$fails" = 0 ]; exit; fi
 
 # mkframe FILE BYTE: a 4x2 XRGB8888 frame (32 bytes) of one byte value, gzipped.
 mkframe() { printf "$(printf '\\x%02x' $(for _ in $(seq 32); do echo "$2"; done))" | gzip -n > "$1"; }

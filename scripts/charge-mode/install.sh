@@ -3,8 +3,9 @@
 # Those units also turn U-Boot's own charge animation off (rockchip,uboot-charge-on 0 in the U-Boot dtb on
 # BOOT or the resource's rk-kernel.dtb), so the two do not run one after the other.
 # V10 boots with no initramfs: init-charge runs it before systemd instead (finishing_touches.sh's init=).
+# $UNIT as build_<unit>.sh exports it (the RG353M's is 353m); frames/ folders use the same names.
 case "$UNIT" in
-  g350|xumini|v10|a10mini|miniloong|rgb30|rg353m) CHARGE_MODE=y ;;
+  g350|xumini|v10|a10mini|miniloong|rgb30|353m) CHARGE_MODE=y ;;
   *) CHARGE_MODE=n ;;
 esac
 

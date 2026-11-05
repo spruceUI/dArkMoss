@@ -5,6 +5,7 @@
 # (where the name is, on logos that have one) and the hint at the bottom; only #545454 and white besides the
 # background, Sundowner's colours.
 #   make-frames.py <unit>...   (Pillow + DejaVu 2.37; DEJAVU_DIR overrides /usr/share/fonts/truetype/dejavu)
+# <unit> is build_<unit>.sh's `export UNIT=` value (353m for the RG353M), as install.sh matches it.
 # Writes scripts/charge-mode/frames/<unit>/ (a unit with two panels: one folder per fb0 width, w<width>/):
 # level-NNN.raw.gz (NNN = 0, 5 ... 100), booting.raw.gz (the unit's boot logo, drawn after the power key) and
 # fb ("<width> <height>"). Frames are fb0's own bytes (XRGB8888: B, G, R, 0xff, as bootlogo.py writes) at its
@@ -44,7 +45,7 @@ UNITS = {
     "v10": [dict(fb=(320, 480), turn="ccw", layout="named", logo="v10/logo.bmp")],
     "miniloong": [dict(fb=(720, 960), turn="ccw", layout=180, logo=None)],
     "rgb30": [dict(fb=(720, 720), turn=None, layout=180, logo="unrotated/dArkMossrgb30.png")],
-    "rg353m": [dict(fb=(640, 480), turn=None, layout=180, logo="unrotated/dArkMoss353m.png")],
+    "353m": [dict(fb=(640, 480), turn=None, layout=180, logo="unrotated/dArkMoss353m.png")],   # the RG353M
     # One image for the A10 Mini and the V4 (720x540, upside down); a10mini-panel.sh's two logos.
     "a10mini": [dict(sub="w640", fb=(640, 480), turn=None, layout=120, logo="unrotated/dArkMoss.bmp"),
                 dict(sub="w720", fb=(720, 540), turn="180", layout=120, logo="a10mini/logo-v4.bmp")],
