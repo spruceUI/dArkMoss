@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0
+# initramfs-tools local-bottom: plugged in while off, the charge screen (charge-mode.sh in the mounted
+# root) until the power key; charger removed -> power off. Any other boot returns at once.
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in prereqs) prereqs; exit 0 ;; esac
+
+rootmnt=${rootmnt:-/root}
+CM="${rootmnt}/usr/local/lib/darkmoss-charge/charge-mode.sh"
+[ -f "$CM" ] || exit 0
+CHARGE_MODE_LOG="${rootmnt}/var/log/darkmoss-charge.log" sh "$CM" "${rootmnt}/usr/local/share/darkmoss-charge"
+[ $? -eq 2 ] || exit 0
+
+echo "Charger removed: powering off"
+sync
+umount "${rootmnt}" 2>/dev/null || mount -o remount,ro "${rootmnt}" 2>/dev/null
+# -f: no init to signal yet
+poweroff -f

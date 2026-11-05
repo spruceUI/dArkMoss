@@ -118,11 +118,15 @@ if [ "$UNIT" == "v10" ]; then
   fi
   sudo fdtput -t s ${mountpoint}/${KERNEL_DTB} /wireless-wlan status disabled
 fi
+source scripts/charge-mode/install.sh
 if [[ " $UBOOT_OPTIN " == *" uboot-dtb "* ]]; then
   # image_setup.sh's opt-in: U-Boot loads only uboot.dtb, so that is the one U-Boot
   # dtb on BOOT; every unit's dts stays in the U-Boot tree.
   sudo cp /tmp/${UNIT}-uboot.dtb ${mountpoint}/uboot.dtb
   sudo rm /tmp/${UNIT}-uboot.dtb
+  if [ "$CHARGE_MODE" == "y" ]; then
+    sudo fdtput -t u ${mountpoint}/uboot.dtb /charge-animation rockchip,uboot-charge-on 0
+  fi
 elif [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "a10mini" ]; then
   sudo cp /tmp/${UNIT}-uboot.dtb ${mountpoint}/rg351mp-uboot.dtb
   sudo rm /tmp/${UNIT}-uboot.dtb

@@ -171,6 +171,7 @@ sudo mkdir -p Arkbuild/lib/firmware/
 sudo rsync -aL --ignore-errors $KERNEL_SRC/lib/firmware/ Arkbuild/lib/firmware/ 2>/dev/null || \
  sudo cp -rL $KERNEL_SRC/lib/firmware/* Arkbuild/lib/firmware/ 2>/dev/null || true
  
+source scripts/charge-mode/install.sh
 # Create uInitrd from generated initramfs
 #sudo cp /usr/bin/qemu-aarch64-static Arkbuild/usr/bin/
 KERNEL_VERSION=$(basename $(find Arkbuild/lib/modules -maxdepth 1 -mindepth 1 -type d))
@@ -242,6 +243,10 @@ if [[ "$UNIT" == "503" ]] || [[ "$UNIT" == *"353"* ]] || [[ "$UNIT" == *"miniloo
     cp ../../../misc/rk3566/device_off_charging_bmps/miniloong/*.bmp .
     #cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb .
     cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}-uboot.dtb rk-kernel.dtb
+    # U-Boot reads its charge-animation node from this dtb.
+    if [ "$CHARGE_MODE" == "y" ]; then
+      fdtput -t u rk-kernel.dtb /charge-animation rockchip,uboot-charge-on 0
+    fi
   else
     cp ../../../misc/rk3566/device_off_charging_bmps/rg353/* .
   fi
