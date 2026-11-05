@@ -70,7 +70,8 @@ def card(w, h, level):
 
 def minimal(w, h, level):
     # The Miniloong's minimal logo (logos/make-miniloong-logos.py), landscape: the tree lit white from the
-    # trunk up to the level, the percentage under it, the hint at the bottom. level None: the logo itself.
+    # trunk up to the level, the percentage under it, the hint at the bottom, in Sundowner's colours only
+    # (#141414, his steps' #545454, white). level None: the logo itself.
     if level is None:
         return mm.logo(w, h).convert("RGB")
     k = h / 4 / 152
@@ -81,8 +82,8 @@ def minimal(w, h, level):
     d = ImageDraw.Draw(im)
     pf, hint = font(False, 22 * s), font(False, 15 * s)
     pct = f"{level}%"
-    d.text(((w - d.textlength(pct, font=pf)) / 2, y0 + 152 * k + 22 * s), pct, font=pf, fill=(200, 200, 200))
-    d.text(((w - d.textlength(TEXT, font=hint)) / 2, h - 40 * s), TEXT, font=hint, fill=(110, 110, 110))
+    d.text(((w - d.textlength(pct, font=pf)) / 2, y0 + 152 * k + 22 * s), pct, font=pf, fill=(255, 255, 255))
+    d.text(((w - d.textlength(TEXT, font=hint)) / 2, h - 40 * s), TEXT, font=hint, fill=(mm.UNLIT,) * 3)
     return im
 
 
