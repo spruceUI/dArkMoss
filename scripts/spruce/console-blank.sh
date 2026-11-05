@@ -23,8 +23,8 @@
 # console and vtcon1 the framebuffer one on the RGB30, but that numbering is not
 # guaranteed.
 #
-# --restore binds it again, from spruce-launch's ExecStopPost: on the G350 a power-off
-# with fbcon unbound stalls for one to five minutes after journald stops.
+# --restore binds it again at power-off on units that opt in (fbcon-restore.service and its
+# shutdown hook): with fbcon unbound, the G350's power-off stalls for 1-5 minutes in the kernel.
 
 BIND=0
 if [ "$1" = "--restore" ]; then

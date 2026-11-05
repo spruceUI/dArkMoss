@@ -37,9 +37,6 @@ ExecStartPre=/usr/local/sbin/mount-spruce.sh
 # Honours the /boot/darkmoss-debug flag. Non-fatal - the dash makes systemd
 # ignore a failure, because a cosmetic fix must not stop the frontend starting.
 ExecStartPre=-/usr/local/sbin/console-blank.sh
-# Bind it again whenever the unit stops, which every spruce power-off does: with
-# fbcon unbound the G350 takes one to five minutes to power off, bound seconds.
-ExecStopPost=-/usr/local/sbin/console-blank.sh --restore
 # runtime.sh is spruce's own entry point; it detects the platform (RGB30 here)
 # and runs its main loop. Runs as root - spruce does its own mounts and touches
 # hardware directly.
