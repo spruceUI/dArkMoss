@@ -17,12 +17,11 @@ the charger powers it off. It is oakMOSS's charge screen, ported from Twig-Next'
 - `frames/<unit>/`: fb0's own bytes (XRGB8888) per 5 % level, plus `booting` (the unit's boot logo,
   drawn after Power) and `fb` (the size they were made for; another fb0 boots normally). A unit with
   two panels has a set per fb0 width (`a10mini/w640`, `a10mini/w720` for the V4). Regenerate with
-  `make-frames.py <unit>` (Pillow, DejaVu 2.37). Every unit's follow the Miniloong's minimal style: the
-  tree of its own boot logo, at the logo's place on the logo's background, lit white from the trunk up
-  (#545454 unlit), the percentage under it (where the name is on the G350, Mini M and V10 logos) and the
-  hint at the bottom. The tree is `logos/make-miniloong-logos.py`'s sharp one; that script also draws the
-  Miniloong's U-Boot logo, charge steps and kernel logo, so there the Power frame is the logo pixel for
-  pixel. The other logos are unchanged (resampled bitmaps: same place, softer edges).
+  `make-frames.py <unit>` (Pillow, DejaVu 2.37; unit names as build_<unit>.sh exports them). The screen is
+  the SPRUCE theme's charging icons (`logos/charging/`, MainUI's charging animation: the tree lit a part at
+  a time), the one for the nearest quarter of the level, centred at the theme's size on the background of
+  the unit's boot logo, with the percentage under it and the hint at the bottom. The RGB30 takes the
+  960x720 set (the theme's 720x720 tree is drawn narrower); the V10 the 640x480 set scaled to 320 px.
 - `install.sh`: sourced by `build_kernel.sh` / `build_kernel-rk3566.sh` before update-initramfs. It
   holds the opt-in list (every CI unit). Opted-in units also get `rockchip,uboot-charge-on = <0>`, so
   U-Boot's own animation does not run first: in BOOT's `uboot.dtb` (G350, Mini M) or

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0
-# Charge-mode frames for charge-mode.sh, every unit in the Miniloong's style: its boot logo's tree, at the
-# logo's place on the logo's background, lit white from the trunk up to the level, the percentage under it
-# (where the name is, on logos that have one) and the hint at the bottom; only #545454 and white besides the
-# background, Sundowner's colours.
+# Charge-mode frames for charge-mode.sh: the SPRUCE theme's charging icons (logos/charging/, MainUI's
+# charging animation: the tree lit a part at a time), centred on the unit's boot-logo background, the one for
+# the nearest quarter of the level; the percentage under it and the hint at the bottom (#545454 and white,
+# the icons' colours).
 #   make-frames.py <unit>...   (Pillow + DejaVu 2.37; DEJAVU_DIR overrides /usr/share/fonts/truetype/dejavu)
 # <unit> is build_<unit>.sh's `export UNIT=` value (353m for the RG353M), as install.sh matches it.
 # Writes scripts/charge-mode/frames/<unit>/ (a unit with two panels: one folder per fb0 width, w<width>/):
@@ -36,19 +36,19 @@ if os.environ.get("DEJAVU_DIR"):
     ml.FONT = os.path.join(os.environ["DEJAVU_DIR"], "DejaVuSans.ttf")
     ml.FONTB = os.path.join(os.environ["DEJAVU_DIR"], "DejaVuSans-Bold.ttf")
 
-# Per panel: fb0's size, the turn its logo has, the logo's layout ("named": make-logo.py's tree over the
-# name; a number: the tree alone, that many pixels tall, centred) and the logo as fb0 shows it (None: the
-# Miniloong's, drawn by make-miniloong-logos.py).
+# Per panel: fb0's size, the turn its logo has, the icon set (logos/charging/<skin>, scaled to the panel's
+# height where the theme has none for it) and the logo as fb0 shows it (None: the Miniloong's, drawn by
+# make-miniloong-logos.py), whose background the frames take.
 UNITS = {
-    "g350": [dict(fb=(640, 480), turn=None, layout="named", logo="g350/logo.bmp")],
-    "xumini": [dict(fb=(480, 640), turn="cw", layout="named", logo="xumini/logo.bmp")],
-    "v10": [dict(fb=(320, 480), turn="ccw", layout="named", logo="v10/logo.bmp")],
-    "miniloong": [dict(fb=(720, 960), turn="ccw", layout=180, logo=None)],
-    "rgb30": [dict(fb=(720, 720), turn=None, layout=180, logo="unrotated/dArkMossrgb30.png")],
-    "353m": [dict(fb=(640, 480), turn=None, layout=180, logo="unrotated/dArkMoss353m.png")],   # the RG353M
+    "g350": [dict(fb=(640, 480), turn=None, icons="skin", logo="g350/logo.bmp")],
+    "xumini": [dict(fb=(480, 640), turn="cw", icons="skin", logo="xumini/logo.bmp")],
+    "v10": [dict(fb=(320, 480), turn="ccw", icons="skin", logo="v10/logo.bmp")],
+    "miniloong": [dict(fb=(720, 960), turn="ccw", icons="skin_960x720", logo=None)],
+    "rgb30": [dict(fb=(720, 720), turn=None, icons="skin_960x720", logo="unrotated/dArkMossrgb30.png")],
+    "353m": [dict(fb=(640, 480), turn=None, icons="skin", logo="unrotated/dArkMoss353m.png")],   # the RG353M
     # One image for the A10 Mini and the V4 (720x540, upside down); a10mini-panel.sh's two logos.
-    "a10mini": [dict(sub="w640", fb=(640, 480), turn=None, layout=120, logo="unrotated/dArkMoss.bmp"),
-                dict(sub="w720", fb=(720, 540), turn="180", layout=120, logo="a10mini/logo-v4.bmp")],
+    "a10mini": [dict(sub="w640", fb=(640, 480), turn=None, icons="skin", logo="unrotated/dArkMoss.bmp"),
+                dict(sub="w720", fb=(720, 540), turn="180", icons="skin_720x540", logo="a10mini/logo-v4.bmp")],
 }
 TEXT = "Charging, press Power to turn on"
 LEVELS = range(0, 101, 5)
@@ -59,38 +59,30 @@ def font(bold, px):
     return ImageFont.truetype(ml.FONTB if bold else ml.FONT, max(8, round(px)))
 
 
-def place(layout, w, h):
-    # The tree's scale and top-left corner on the landscape logo, and where the percentage goes
-    # (its top and size).
-    s = h / 480
-    if layout == "named":
-        # make-logo.py logo(): spruce-tree.png at twice its size (scaled down below 480 px), centred
-        # with the name under it.
-        kl = min(1.0, min(w, h) / 480)
-        tw, th = round(88 * 2 * kl), round(152 * 2 * kl)
-        name = font(True, 46 * kl)
-        asc, desc = name.getmetrics()
-        gap = round(22 * kl)
-        top, left = (h - (th + gap + asc + desc)) // 2, (w - tw) // 2
-        k = 2 * kl
-        return k, left + (tw - 88 * k) / 2, top + (th - 152 * k) / 2, top + th + gap, 46 * kl
-    k = layout / 152
-    x0, y0 = (w - 88 * k) / 2, (h - 152 * k) / 2
-    return k, x0, y0, y0 + 152 * k + 22 * s, 22 * s
+def icon(skin, step, h):
+    # charging-0<step>.png (1 unlit .. 5 all lit), scaled (premultiplied) to a panel of height h if its strip
+    # is another height.
+    im = Image.open(os.path.join(LOGOS, "charging", skin, f"charging-0{step}.png")).convert("RGBA")
+    if im.height != h:
+        k = h / im.height
+        im = im.convert("RGBa").resize((round(im.width * k), h), Image.LANCZOS).convert("RGBA")
+    return im
 
 
-def frame(w, h, layout, bg, level):
-    # Landscape: the tree unlit grey and lit white from the trunk up to the level, then the texts.
-    k, x0, y0, py, psize = place(layout, w, h)
-    lit = None if level == 0 else {} if level == 100 else dict(clear=mm.above(152 - 152.5 * level / 100))
-    im = mm.tree_image((w, h), k, x0, y0, bg, unlit=mm.UNLIT, lit=lit).convert("RGB")
+def frame(w, h, skin, bg, level):
+    # Landscape: the icon for the nearest quarter (MainUI's 0/25/50/75/100 %) centred as MainUI draws its
+    # strip, the percentage under the tree, the hint at the bottom.
+    im = Image.new("RGBA", (w, h), (bg, bg, bg, 255))
+    ic = icon(skin, int(level / 25 + 0.5) + 1, h)
+    im.alpha_composite(ic, ((w - ic.width) // 2, 0))
+    tree = icon(skin, 5, h).getchannel("A").point(lambda a: 255 if a > 127 else 0).getbbox()
     s = h / 480
     d = ImageDraw.Draw(im)
-    pf, hint = font(False, psize), font(False, 15 * s)
+    pf, hint = font(False, 22 * s), font(False, 15 * s)
     pct = f"{level}%"
-    d.text(((w - d.textlength(pct, font=pf)) / 2, py), pct, font=pf, fill=WHITE)
+    d.text(((w - d.textlength(pct, font=pf)) / 2, tree[3] + 22 * s), pct, font=pf, fill=WHITE)
     d.text(((w - d.textlength(TEXT, font=hint)) / 2, h - 40 * s), TEXT, font=hint, fill=GREY)
-    return im
+    return im.convert("RGB")
 
 
 def turn(im, rot):
@@ -129,7 +121,7 @@ def main(units):
             out = os.path.join(HERE, "frames", unit, p.get("sub", ""))
             os.makedirs(out, exist_ok=True)
             for level in LEVELS:
-                save(turn(frame(lw, lh, p["layout"], bg, level), p["turn"]), os.path.join(out, f"level-{level:03d}.raw.gz"))
+                save(turn(frame(lw, lh, p["icons"], bg, level), p["turn"]), os.path.join(out, f"level-{level:03d}.raw.gz"))
             save(booting, os.path.join(out, "booting.raw.gz"))
             with open(os.path.join(out, "fb"), "w") as f:
                 f.write(f"{w} {h}\n")
