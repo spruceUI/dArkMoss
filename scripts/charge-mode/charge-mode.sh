@@ -64,7 +64,7 @@ level_frame() {
 }
 
 # The frames are fb0's own bytes at its size (make-frames.py), written at the panned offset.
-read -r FW _ < "$FRAMES/fb" 2>/dev/null
+read -r FW _ 2>/dev/null < "$FRAMES/fb"
 STRIDE=$(cat $FBSYS/stride 2>/dev/null)
 show() {
     _y=$(cut -d, -f2 $FBSYS/pan 2>/dev/null)

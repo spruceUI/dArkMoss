@@ -179,7 +179,7 @@ hook() {   # hook RC: run darkmoss-charge with a charge-mode.sh stub that exits 
     --ro-bind /usr/bin/busybox /usr/bin/busybox --proc /proc --dev /dev \
     --bind "$T/hook/root" /root --bind "$T/hook/out" /out --ro-bind "$T/hook/bin" /bin \
     --ro-bind "$T/darkmoss-charge" /hook --setenv PATH /bin --setenv rootmnt /root /bin/sh /hook > /dev/null
-  HRC=$?; CALLS=$(tr '\n' '|' < "$T/hook/out/calls" 2>/dev/null)
+  HRC=$?; CALLS=$(tr '\n' '|' 2>/dev/null < "$T/hook/out/calls")
 }
 hook 2
 [ "$CALLS" = "args /root/usr/local/share/darkmoss-charge log /root/var/log/darkmoss-charge.log|sync |umount /root|poweroff -f|" ] \
