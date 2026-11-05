@@ -38,6 +38,9 @@ fi
 # a second udev pass (~3 s in a V10 boot log).
 if [ "$UNIT" == "v10" ]; then
   ROOTFS_ARGS=" rootfstype=btrfs"
+  # The charge screen runs as PID 1 before systemd here (scripts/charge-mode/init-charge).
+  [ -x Arkbuild/usr/local/lib/darkmoss-charge/init-charge ] &&
+    ROOTFS_ARGS="${ROOTFS_ARGS} init=/usr/local/lib/darkmoss-charge/init-charge"
   INITRD_LOAD_LINE=""
   BOOTI_LINE='booti ${loadaddr} - ${dtb_loadaddr}'
 else

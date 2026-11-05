@@ -243,12 +243,13 @@ if [[ "$UNIT" == "503" ]] || [[ "$UNIT" == *"353"* ]] || [[ "$UNIT" == *"miniloo
     cp ../../../misc/rk3566/device_off_charging_bmps/miniloong/*.bmp .
     #cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb .
     cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}-uboot.dtb rk-kernel.dtb
-    # U-Boot reads its charge-animation node from this dtb.
-    if [ "$CHARGE_MODE" == "y" ]; then
-      fdtput -t u rk-kernel.dtb /charge-animation rockchip,uboot-charge-on 0
-    fi
   else
     cp ../../../misc/rk3566/device_off_charging_bmps/rg353/* .
+  fi
+  # U-Boot reads its charge-animation node from rk-kernel.dtb: off where the charge screen runs.
+  if [ "$CHARGE_MODE" == "y" ]; then
+    fdtput -t u rk-kernel.dtb /charge-animation rockchip,uboot-charge-on 0
+    verify_action
   fi
   # Use Anbernic's resource.img files to provide onscreen battery charging state while off
   ./resource_tool --pack *.bmp rk-kernel.dtb
@@ -291,6 +292,28 @@ else
     fi
     # The tree is only ever needed for that one file.
     rm -rf rg503Kernel
+  fi
+  # That resource's rk-kernel.dtb has U-Boot's charge animation on too: unpack it, turn the animation
+  # off and repack (entries carry hashes, so not in place). The cached copy above stays as built.
+  if [ "$CHARGE_MODE" == "y" ]; then
+    rm -rf charge-rkbin charge-res charge-check
+    git clone --depth=1 https://github.com/rockchip-linux/rkbin charge-rkbin
+    verify_action
+    mkdir charge-res charge-check
+    charge-rkbin/tools/resource_tool --unpack --image=resource.img charge-res
+    verify_action
+    fdtput -t u charge-res/rk-kernel.dtb /charge-animation rockchip,uboot-charge-on 0
+    verify_action
+    (cd charge-res && ../charge-rkbin/tools/resource_tool --pack --image=../resource-charge.img *)
+    verify_action
+    charge-rkbin/tools/resource_tool --unpack --image=resource-charge.img charge-check
+    if ! diff -r charge-res charge-check ||
+       [ "$(fdtget charge-check/rk-kernel.dtb /charge-animation rockchip,uboot-charge-on)" != 0 ]; then
+      echo "ERROR: the repacked resource.img does not hold the same files with the animation off."
+      exit 1
+    fi
+    mv resource-charge.img resource.img
+    rm -rf charge-rkbin charge-res charge-check
   fi
 fi
 git clone --depth=1 https://github.com/christianhaitian/rk356x-uboot.git

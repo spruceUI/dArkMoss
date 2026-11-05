@@ -1,95 +1,100 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0
-# Charge-mode frames for charge-mode.sh: oakMOSS's charge screen (make-charge-screens.py card()) with
-# dArkMoss's tree, name and background from logos/make-logo.py; the Miniloong's follow its minimal logo.
+# Charge-mode frames for charge-mode.sh, every unit in the Miniloong's style: its boot logo's tree, at the
+# logo's place on the logo's background, lit white from the trunk up to the level, the percentage under it
+# (where the name is, on logos that have one) and the hint at the bottom; only #545454 and white besides the
+# background, Sundowner's colours.
 #   make-frames.py <unit>...   (Pillow + DejaVu 2.37; DEJAVU_DIR overrides /usr/share/fonts/truetype/dejavu)
-# Writes scripts/charge-mode/frames/<unit>/: level-NNN.raw.gz (NNN = 0, 5 ... 100), booting.raw.gz (the
-# boot logo, drawn after the power key) and fb ("<width> <height>"). Frames are fb0's own bytes
-# (XRGB8888: B, G, R, 0xff, as bootlogo.py writes) at its size, turned for the panel like the logo.
+# Writes scripts/charge-mode/frames/<unit>/ (a unit with two panels: one folder per fb0 width, w<width>/):
+# level-NNN.raw.gz (NNN = 0, 5 ... 100), booting.raw.gz (the unit's boot logo, drawn after the power key) and
+# fb ("<width> <height>"). Frames are fb0's own bytes (XRGB8888: B, G, R, 0xff, as bootlogo.py writes) at its
+# size, turned for the panel like the logo.
 import gzip
 import importlib.util
 import os
 import sys
 
-sys.dont_write_bytecode = True   # no __pycache__ in logos/ from the import below
+sys.dont_write_bytecode = True   # no __pycache__ in logos/ from the imports below
 
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-_spec = importlib.util.spec_from_file_location("ml", os.path.join(HERE, "..", "..", "logos", "make-logo.py"))
-ml = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(ml)
-_spec = importlib.util.spec_from_file_location("mm", os.path.join(HERE, "..", "..", "logos", "make-miniloong-logos.py"))
-mm = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(mm)
+LOGOS = os.path.join(HERE, "..", "..", "logos")
+
+
+def _load(name, path):
+    spec = importlib.util.spec_from_file_location(name, os.path.join(LOGOS, path))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+ml = _load("ml", "make-logo.py")
+mm = _load("mm", "make-miniloong-logos.py")
 if os.environ.get("DEJAVU_DIR"):
     ml.FONT = os.path.join(os.environ["DEJAVU_DIR"], "DejaVuSans.ttf")
     ml.FONTB = os.path.join(os.environ["DEJAVU_DIR"], "DejaVuSans-Bold.ttf")
 
-# fb0 as the kernel sets it up, the turn its logo has, and the frame style.
-UNITS = {"g350": (640, 480, None, "card"), "xumini": (480, 640, "cw", "card"),
-         "miniloong": (720, 960, "ccw", "minimal")}
+# Per panel: fb0's size, the turn its logo has, the logo's layout ("named": make-logo.py's tree over the
+# name; a number: the tree alone, that many pixels tall, centred) and the logo as fb0 shows it (None: the
+# Miniloong's, drawn by make-miniloong-logos.py).
+UNITS = {
+    "g350": [dict(fb=(640, 480), turn=None, layout="named", logo="g350/logo.bmp")],
+    "xumini": [dict(fb=(480, 640), turn="cw", layout="named", logo="xumini/logo.bmp")],
+    "v10": [dict(fb=(320, 480), turn="ccw", layout="named", logo="v10/logo.bmp")],
+    "miniloong": [dict(fb=(720, 960), turn="ccw", layout=180, logo=None)],
+    "rgb30": [dict(fb=(720, 720), turn=None, layout=180, logo="unrotated/dArkMossrgb30.png")],
+    "rg353m": [dict(fb=(640, 480), turn=None, layout=180, logo="unrotated/dArkMoss353m.png")],
+    # One image for the A10 Mini and the V4 (720x540, upside down); a10mini-panel.sh's two logos.
+    "a10mini": [dict(sub="w640", fb=(640, 480), turn=None, layout=120, logo="unrotated/dArkMoss.bmp"),
+                dict(sub="w720", fb=(720, 540), turn="180", layout=120, logo="a10mini/logo-v4.bmp")],
+}
 TEXT = "Charging, press Power to turn on"
 LEVELS = range(0, 101, 5)
+WHITE, GREY = (255, 255, 255), (mm.UNLIT,) * 3
 
 
 def font(bold, px):
     return ImageFont.truetype(ml.FONTB if bold else ml.FONT, max(8, round(px)))
 
 
-def card(w, h, level):
-    # oakMOSS's layout, landscape: tree, name, the grey line, then the battery and its percentage.
-    s = min(w / 640.0, h / 480.0)
-    im = Image.new("RGBA", (w, h), ml.BG)
-    d = ImageDraw.Draw(im)
-    tree = Image.open(ml.TREE).convert("RGBA")
-    tree = tree.resize((round(tree.width * 150 * s / tree.height), round(150 * s)), Image.LANCZOS)
-    title, small, pf = font(True, 46 * s), font(False, 22 * s), font(True, 30 * s)
-    asc, desc = title.getmetrics()
-    sasc, sdesc = small.getmetrics()
-    bw, bh, nub = 96 * s, 44 * s, 8 * s
-    y = (h - (tree.height + 14 * s + asc + desc + 6 * s + sasc + sdesc + 26 * s + bh)) / 2
-    im.alpha_composite(tree, (round((w - tree.width) / 2), round(y)))
-    y += tree.height + 14 * s
-    d.text(((w - d.textlength("dArkMoss", font=title)) / 2, y), "dArkMoss", font=title, fill=(235, 235, 235))
-    y += asc + desc + 6 * s
-    d.text(((w - d.textlength(TEXT, font=small)) / 2, y), TEXT, font=small, fill=(170, 170, 170))
-    y += sasc + sdesc + 26 * s
-    pct = f"{level}%"
-    x = (w - (bw + nub + 18 * s + d.textlength(pct, font=pf))) / 2
-    d.rectangle([x, y, x + bw, y + bh], outline=(235, 235, 235), width=max(2, round(3 * s)))
-    d.rectangle([x + bw, y + bh * 0.3, x + bw + nub, y + bh * 0.7], fill=(235, 235, 235))
-    if level > 0:
-        inner = 6 * s
-        fill = (220, 60, 60) if level < 15 else (80, 200, 90)
-        d.rectangle([x + inner, y + inner, x + inner + (bw - 2 * inner) * level / 100, y + bh - inner], fill=fill)
-    pasc, pdesc = pf.getmetrics()
-    d.text((x + bw + nub + 18 * s, y + (bh - pasc - pdesc) / 2), pct, font=pf, fill=(235, 235, 235))
-    return im.convert("RGB")
-
-
-def minimal(w, h, level):
-    # The Miniloong's minimal logo (logos/make-miniloong-logos.py), landscape: the tree lit white from the
-    # trunk up to the level, the percentage under it, the hint at the bottom, in Sundowner's colours only
-    # (#141414, his steps' #545454, white). level None: the logo itself.
-    if level is None:
-        return mm.logo(w, h).convert("RGB")
-    k = h / 4 / 152
+def place(layout, w, h):
+    # The tree's scale and top-left corner on the landscape logo, and where the percentage goes
+    # (its top and size).
+    s = h / 480
+    if layout == "named":
+        # make-logo.py logo(): spruce-tree.png at twice its size (scaled down below 480 px), centred
+        # with the name under it.
+        kl = min(1.0, min(w, h) / 480)
+        tw, th = round(88 * 2 * kl), round(152 * 2 * kl)
+        name = font(True, 46 * kl)
+        asc, desc = name.getmetrics()
+        gap = round(22 * kl)
+        top, left = (h - (th + gap + asc + desc)) // 2, (w - tw) // 2
+        k = 2 * kl
+        return k, left + (tw - 88 * k) / 2, top + (th - 152 * k) / 2, top + th + gap, 46 * kl
+    k = layout / 152
     x0, y0 = (w - 88 * k) / 2, (h - 152 * k) / 2
+    return k, x0, y0, y0 + 152 * k + 22 * s, 22 * s
+
+
+def frame(w, h, layout, bg, level):
+    # Landscape: the tree unlit grey and lit white from the trunk up to the level, then the texts.
+    k, x0, y0, py, psize = place(layout, w, h)
     lit = None if level == 0 else {} if level == 100 else dict(clear=mm.above(152 - 152.5 * level / 100))
-    im = mm.tree_image((w, h), k, x0, y0, mm.BG, unlit=mm.UNLIT, lit=lit).convert("RGB")
+    im = mm.tree_image((w, h), k, x0, y0, bg, unlit=mm.UNLIT, lit=lit).convert("RGB")
     s = h / 480
     d = ImageDraw.Draw(im)
-    pf, hint = font(False, 22 * s), font(False, 15 * s)
+    pf, hint = font(False, psize), font(False, 15 * s)
     pct = f"{level}%"
-    d.text(((w - d.textlength(pct, font=pf)) / 2, y0 + 152 * k + 22 * s), pct, font=pf, fill=(255, 255, 255))
-    d.text(((w - d.textlength(TEXT, font=hint)) / 2, h - 40 * s), TEXT, font=hint, fill=(mm.UNLIT,) * 3)
+    d.text(((w - d.textlength(pct, font=pf)) / 2, py), pct, font=pf, fill=WHITE)
+    d.text(((w - d.textlength(TEXT, font=hint)) / 2, h - 40 * s), TEXT, font=hint, fill=GREY)
     return im
 
 
 def turn(im, rot):
     return {None: im, "cw": im.transpose(Image.Transpose.ROTATE_270),
-            "ccw": im.transpose(Image.Transpose.ROTATE_90)}[rot]
+            "ccw": im.transpose(Image.Transpose.ROTATE_90), "180": im.transpose(Image.Transpose.ROTATE_180)}[rot]
 
 
 def save(im, path):
@@ -99,26 +104,35 @@ def save(im, path):
         f.write(raw)
 
 
+def logo_of(p):
+    # The boot logo as fb0 shows it (turned like the frames).
+    w, h = p["fb"]
+    if p["logo"] is None:
+        lw, lh = (h, w) if p["turn"] in ("cw", "ccw") else (w, h)
+        return turn(mm.logo(lw, lh).convert("RGB"), p["turn"])
+    im = Image.open(os.path.join(LOGOS, p["logo"])).convert("RGB")
+    if im.size != (w, h):
+        sys.exit(f"{p['logo']} is {im.size[0]}x{im.size[1]}, fb0 {w}x{h}")
+    return im
+
+
 def main(units):
     mm.check_tree()
     for unit in units:
-        w, h, rot, style = UNITS[unit]
-        lw, lh = (h, w) if rot else (w, h)
-        out = os.path.join(HERE, "frames", unit)
-        os.makedirs(out, exist_ok=True)
-        draw = minimal if style == "minimal" else card
-        for level in LEVELS:
-            save(turn(draw(lw, lh, level), rot), os.path.join(out, f"level-{level:03d}.raw.gz"))
-        # The unit's own logo.bmp when it has one, so the frame is the picture U-Boot and bootlogo.py show.
-        logo = os.path.join(HERE, "..", "..", "logos", unit, "logo.bmp")
-        if style == "minimal":
-            booting = turn(minimal(lw, lh, None), rot)
-        else:
-            booting = Image.open(logo).convert("RGB") if os.path.exists(logo) else turn(ml.logo(lw, lh), rot)
-        save(booting, os.path.join(out, "booting.raw.gz"))
-        with open(os.path.join(out, "fb"), "w") as f:
-            f.write(f"{w} {h}\n")
-        print(f"{unit}: {len(LEVELS)} level frames + booting ({w}x{h})")
+        for p in UNITS[unit]:
+            w, h = p["fb"]
+            lw, lh = (h, w) if p["turn"] in ("cw", "ccw") else (w, h)
+            booting = logo_of(p)
+            # The logo's own background (its first pixel; every logo is a flat grey there).
+            bg = booting.convert("L").getpixel((0, 0))
+            out = os.path.join(HERE, "frames", unit, p.get("sub", ""))
+            os.makedirs(out, exist_ok=True)
+            for level in LEVELS:
+                save(turn(frame(lw, lh, p["layout"], bg, level), p["turn"]), os.path.join(out, f"level-{level:03d}.raw.gz"))
+            save(booting, os.path.join(out, "booting.raw.gz"))
+            with open(os.path.join(out, "fb"), "w") as f:
+                f.write(f"{w} {h}\n")
+            print(f"{unit}{'/' + p['sub'] if 'sub' in p else ''}: {len(LEVELS)} level frames + booting ({w}x{h}, bg {bg})")
 
 
 if __name__ == "__main__":
