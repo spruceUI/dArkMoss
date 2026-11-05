@@ -3,7 +3,7 @@
 # Those units also turn U-Boot's own charge animation off (rockchip,uboot-charge-on 0 in BOOT's uboot.dtb
 # or the resource's rk-kernel.dtb), so the two do not run one after the other.
 case "$UNIT" in
-  g350|xumini) CHARGE_MODE=y ;;
+  g350|xumini|miniloong) CHARGE_MODE=y ;;
   *) CHARGE_MODE=n ;;
 esac
 
