@@ -13,7 +13,8 @@ the charger powers it off. It is oakMOSS's charge screen, ported from Twig-Next'
   at once. One line per boot goes to `/var/log/darkmoss-charge.log`.
 - `frames/<unit>/`: fb0's own bytes (XRGB8888) per 5 % level, plus `booting` (the boot logo, drawn
   after Power) and `fb` (the size they were made for; another fb0 boots normally). Regenerate with
-  `make-frames.py <unit>` (Pillow, DejaVu 2.37).
+  `make-frames.py <unit>` (Pillow, DejaVu 2.37). The Miniloong's follow its minimal logo: the tree
+  alone, lit from the trunk up, drawn from a 45-degree polygon trace of `logos/spruce-tree.png`.
 - `install.sh`: sourced by `build_kernel.sh` / `build_kernel-rk3566.sh` before update-initramfs. It
   holds the opt-in list. Opted-in units also get `rockchip,uboot-charge-on = <0>` (BOOT's `uboot.dtb`
   on RK3326, the resource partition's `rk-kernel.dtb` on RK3566), so U-Boot's own animation does

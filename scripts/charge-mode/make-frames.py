@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0
 # Charge-mode frames for charge-mode.sh: oakMOSS's charge screen (make-charge-screens.py card()) with
-# dArkMoss's tree, name and background from logos/make-logo.py.
+# dArkMoss's tree, name and background from logos/make-logo.py; the Miniloong's follow its minimal logo.
 #   make-frames.py <unit>...   (Pillow + DejaVu 2.37; DEJAVU_DIR overrides /usr/share/fonts/truetype/dejavu)
 # Writes scripts/charge-mode/frames/<unit>/: level-NNN.raw.gz (NNN = 0, 5 ... 100), booting.raw.gz (the
 # boot logo, drawn after the power key) and fb ("<width> <height>"). Frames are fb0's own bytes
@@ -23,10 +23,20 @@ if os.environ.get("DEJAVU_DIR"):
     ml.FONT = os.path.join(os.environ["DEJAVU_DIR"], "DejaVuSans.ttf")
     ml.FONTB = os.path.join(os.environ["DEJAVU_DIR"], "DejaVuSans-Bold.ttf")
 
-# fb0 as the kernel sets it up, and the turn make-logo.py gives that unit's logo.bmp.
-UNITS = {"g350": (640, 480, None), "xumini": (480, 640, "cw"), "miniloong": (720, 960, "ccw")}
+# fb0 as the kernel sets it up, the turn its logo has, and the frame style.
+UNITS = {"g350": (640, 480, None, "card"), "xumini": (480, 640, "cw", "card"),
+         "miniloong": (720, 960, "ccw", "minimal")}
 TEXT = "Charging, press Power to turn on"
 LEVELS = range(0, 101, 5)
+
+# The Miniloong's minimal logo (misc/rk3566/device_off_charging_bmps/miniloong/logo.bmp): the tree alone,
+# a quarter of the height tall, centred on #141414. TREE is spruce-tree.png's outline as 45-degree polygons
+# (rasterized at 1x it is the 88x152 bitmap but for one stair pixel), so the tree stays sharp at any size.
+TREE = [[(40, -0.5), (0.5, 39), (17.5, 56), (0.5, 73), (17, 89.5), (0, 106.5), (17.5, 124), (48.5, 93),
+         (79.5, 124), (88.5, 115), (40.5, 67), (48.5, 59), (79.5, 90), (88, 81.5), (40, 33.5), (48, 25.5),
+         (79, 56.5), (88, 47.5)],
+        [(40, 118), (40, 152), (57, 152), (57, 118)]]
+MIN_BG, UNLIT, SS = (20, 20, 20), (84, 84, 84), 8   # UNLIT: the off-charging BMPs' grey; SS: supersampling
 
 
 def font(bold, px):
@@ -64,6 +74,44 @@ def card(w, h, level):
     return im.convert("RGB")
 
 
+def tree_mask(size, k, x0, y0, top=None):
+    # TREE scaled by k at (x0, y0), drawn SS times larger and averaged down; top cuts off what is above it.
+    big = Image.new("L", (size[0] * SS, size[1] * SS), 0)
+    d = ImageDraw.Draw(big)
+    for poly in TREE:
+        d.polygon([((x * k + x0) * SS, (y * k + y0) * SS) for x, y in poly], fill=255)
+    if top is not None:
+        d.rectangle([0, 0, big.width, (top * k + y0) * SS], fill=0)
+    return big.reduce(SS)
+
+
+def check_tree():
+    a = Image.open(ml.TREE).getchannel("A")
+    off = sum((m > 127) != (v > 127) for m, v in zip(a.tobytes(), tree_mask(a.size, 1, 0, 0).tobytes()))
+    if off > 1:
+        sys.exit(f"make-frames.py: TREE no longer traces {ml.TREE} ({off} pixels differ)")
+
+
+def minimal(w, h, level):
+    # Landscape: the tree lit white from the trunk up to the level (the off-charging BMPs' idea, fb5a9fc),
+    # the percentage under it, the hint at the bottom. level None: the logo itself.
+    k = h / 4 / 152
+    x0, y0 = (w - 88 * k) / 2, (h - 152 * k) / 2
+    im = Image.new("RGB", (w, h), MIN_BG)
+    lit = 100 if level is None else level
+    im.paste(UNLIT, mask=tree_mask((w, h), k, x0, y0))
+    if lit > 0:
+        im.paste((255, 255, 255), mask=tree_mask((w, h), k, x0, y0, top=152 - 152.5 * lit / 100))
+    if level is not None:
+        s = h / 480
+        d = ImageDraw.Draw(im)
+        pf, hint = font(False, 22 * s), font(False, 15 * s)
+        pct = f"{level}%"
+        d.text(((w - d.textlength(pct, font=pf)) / 2, y0 + 152 * k + 22 * s), pct, font=pf, fill=(200, 200, 200))
+        d.text(((w - d.textlength(TEXT, font=hint)) / 2, h - 40 * s), TEXT, font=hint, fill=(110, 110, 110))
+    return im
+
+
 def turn(im, rot):
     return {None: im, "cw": im.transpose(Image.Transpose.ROTATE_270),
             "ccw": im.transpose(Image.Transpose.ROTATE_90)}[rot]
@@ -77,17 +125,22 @@ def save(im, path):
 
 
 def main(units):
+    check_tree()
     for unit in units:
-        w, h, rot = UNITS[unit]
+        w, h, rot, style = UNITS[unit]
         lw, lh = (h, w) if rot else (w, h)
         out = os.path.join(HERE, "frames", unit)
         os.makedirs(out, exist_ok=True)
+        draw = minimal if style == "minimal" else card
         for level in LEVELS:
-            save(turn(card(lw, lh, level), rot), os.path.join(out, f"level-{level:03d}.raw.gz"))
+            save(turn(draw(lw, lh, level), rot), os.path.join(out, f"level-{level:03d}.raw.gz"))
         # The unit's own logo.bmp when it has one, so the frame is the picture U-Boot and bootlogo.py show.
         logo = os.path.join(HERE, "..", "..", "logos", unit, "logo.bmp")
-        save(Image.open(logo).convert("RGB") if os.path.exists(logo) else turn(ml.logo(lw, lh), rot),
-             os.path.join(out, "booting.raw.gz"))
+        if style == "minimal":
+            booting = turn(minimal(lw, lh, None), rot)
+        else:
+            booting = Image.open(logo).convert("RGB") if os.path.exists(logo) else turn(ml.logo(lw, lh), rot)
+        save(booting, os.path.join(out, "booting.raw.gz"))
         with open(os.path.join(out, "fb"), "w") as f:
             f.write(f"{w} {h}\n")
         print(f"{unit}: {len(LEVELS)} level frames + booting ({w}x{h})")
