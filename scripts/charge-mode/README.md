@@ -36,5 +36,7 @@ the charger powers it off. It is oakMOSS's charge screen, ported from Twig-Next'
 Wake keys are the power key and every key-only input node. Joypads that also report sticks are not
 read: their axis events are more than the shell can follow.
 
-Not yet seen on hardware: whether each unit powers on at plug-in, its `on=` values, the panel
-blank/unblank through fb0, and which key nodes exist in the initramfs.
+Seen on hardware (2026-11-06): it works on the V10, RGB30 and Miniloong. The A10 Mini does not
+power on at plug-in (every boot it logged is `on=0x80`, the power key), so charge mode never runs
+there; the G350 may be the same. Not yet tested: the Mini M and the RG353M. Still open: the panel
+blank/unblank timing and which key nodes wake each unit.
