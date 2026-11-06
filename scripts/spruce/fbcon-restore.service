@@ -1,0 +1,13 @@
+[Unit]
+Description=Bind fbcon again at power-off, once spruce has let go of the panel
+DefaultDependencies=no
+# Started by poweroff.target after spruce-launch stops. spruce's own power-off gets there only after
+# it has killed PyUI, so the farewell frame stays up: binding takes the panel back from its holder.
+After=spruce-launch.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/console-blank.sh --restore
+
+[Install]
+WantedBy=poweroff.target
