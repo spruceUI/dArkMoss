@@ -117,6 +117,10 @@ if [ "$UNIT" == "v10" ]; then
     sudo apt -y install device-tree-compiler
   fi
   sudo fdtput -t s ${mountpoint}/${KERNEL_DTB} /wireless-wlan status disabled
+  # The SD card runs at 1.8 V (SDR104); on a reboot the V10's U-Boot then failed to read it. With
+  # supports-emmc the kernel sets it back to 3.3 V at shutdown (sd.c _mmc_sd_shutdown; tested on a V10).
+  sudo fdtput ${mountpoint}/${KERNEL_DTB} /dwmmc@ff370000 supports-emmc
+  verify_action
 fi
 source scripts/charge-mode/install.sh
 if [[ " $UBOOT_OPTIN " == *" uboot-dtb "* ]]; then
