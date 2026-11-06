@@ -139,6 +139,13 @@ elif [ "$UNIT" == "rgb10" ]; then
   sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB_ALT} ${mountpoint}/rk3326-odroidgo2-linux-v11.dtb.oga11
   sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB_RGB10S} ${mountpoint}/rk3326-odroidgo2-linux-v11.dtb.rgb10s
 fi
+# V10: U-Boot reads its charge animation's dtb from the SPI flash, which no image writes. A
+# "manufacture" file on BOOT makes the board code skip the animation (u-boot-rk3326 odroidgoa.c).
+if [ "$UNIT" == "v10" ] && [ "$CHARGE_MODE" == "y" ]; then
+  echo "dArkMoss charge mode: U-Boot skips its own charge animation while this file is here." |
+    sudo tee ${mountpoint}/manufacture > /dev/null
+  verify_action
+fi
 
 # The G350/Mini M "Loading..." hook is gone; a cached chroot may still carry it.
 sudo rm -f Arkbuild/etc/initramfs-tools/scripts/init-top/darkmoss-loading

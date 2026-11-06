@@ -26,8 +26,10 @@ the charger powers it off. It is oakMOSS's charge screen, ported from Twig-Next'
   holds the opt-in list (every CI unit). Opted-in units also get `rockchip,uboot-charge-on = <0>`, so
   U-Boot's own animation does not run first: in BOOT's `uboot.dtb` (G350, Mini M) or
   `rg351mp-uboot.dtb` (A10 Mini), and in the resource partition's `rk-kernel.dtb` on RK3566 (the
-  RGB30's cached RG503 resource is unpacked and repacked for it). The V10 ships no U-Boot dtb, so its
-  U-Boot is unchanged. U-Boot's low-battery hold is unchanged everywhere.
+  RGB30's cached RG503 resource is unpacked and repacked for it). The V10's U-Boot (u-boot-rk3326)
+  takes the animation's dtb and pictures from the board's SPI flash, which no image writes, so its
+  BOOT gets a `manufacture` file instead: with it, odroidgoa.c skips `charge_display()`. U-Boot's
+  low-battery hold is unchanged everywhere.
 - `test/run.sh`: host test under busybox in bwrap on Linux. `run.sh install` alone (plain bash) runs
   install.sh with each CI unit's `export UNIT=` value: unit names here are those (the RG353M's is `353m`).
 
