@@ -135,10 +135,6 @@ if [[ " $UBOOT_OPTIN " == *" uboot-dtb "* ]]; then
 elif [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "a10mini" ]; then
   sudo cp /tmp/${UNIT}-uboot.dtb ${mountpoint}/rg351mp-uboot.dtb
   sudo rm /tmp/${UNIT}-uboot.dtb
-  if [ "$CHARGE_MODE" == "y" ]; then
-    sudo fdtput -t u ${mountpoint}/rg351mp-uboot.dtb /charge-animation rockchip,uboot-charge-on 0
-    verify_action
-  fi
 elif [ "$UNIT" == "rgb10" ]; then
   sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB_ALT} ${mountpoint}/rk3326-odroidgo2-linux-v11.dtb.oga11
   sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB_RGB10S} ${mountpoint}/rk3326-odroidgo2-linux-v11.dtb.rgb10s

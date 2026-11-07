@@ -25,8 +25,15 @@ install_log() { (cd "$T/inst" && UNIT=$1 bash -c 'sudo() { echo "sudo $*"; }; so
   echo "CHARGE_MODE=$CHARGE_MODE"' 2>&1); }
 HOOK="sudo install -D -m 0755 scripts/charge-mode/darkmoss-charge "
 INITC="sudo install -D -m 0755 scripts/charge-mode/init-charge "
+# CI units left out on purpose: the A10 Mini never powers on at plug-in.
+NOT_IN=" a10mini "
 for u in $(cat "$REPO/.github/units.txt"); do
   unit=$(sed -n 's/^export UNIT=//p' "$REPO/build_$u.sh"); out=$(install_log "$unit"); fr="$REPO/scripts/charge-mode/frames/$unit"
+  if [[ "$NOT_IN" == *" $unit "* ]]; then
+    grep -qx "CHARGE_MODE=n" <<< "$out" && ! grep -q "sudo install\|sudo cp" <<< "$out" \
+      && ok "install.sh $u (UNIT=$unit): left out on purpose, installs nothing" || bad "install.sh $u (UNIT=$unit): $(tr '\n' '|' <<< "$out")"
+    continue
+  fi
   { [ -f "$fr/level-100.raw.gz" ] && [ -f "$fr/fb" ]; } || ls "$fr"/w*/fb > /dev/null 2>&1 || out="$out|no frames in $fr"
   if [ "$unit" = v10 ]; then want="$INITC"; nowant="$HOOK"; else want="$HOOK"; nowant="$INITC"; fi
   case "$out" in *"no frames in"*) bad "install.sh $u (UNIT=$unit): $out" ;;
