@@ -27,9 +27,14 @@ fi
 
 DEVICE="$(tr -d '\0' < /home/ark/.config/.DEVICE 2>/dev/null)"
 
-# Only apply to miniloong
+# Only apply to the units with a rotated panel: the console's native rotation
+# on the panel, 0 on HDMI.
 case "$DEVICE" in
   *miniloong*|*MINILOONG*)
+    PANEL_ROTATE=3
+    ;;
+  *e5plus*|*E5PLUS*)
+    PANEL_ROTATE=1
     ;;
   *)
     exit 0
@@ -56,5 +61,5 @@ done
 if [ "$HDMI_STATUS" = "connected" ]; then
   echo 0 > /sys/class/graphics/fbcon/rotate_all 2>/dev/null
 else
-  echo 3 > /sys/class/graphics/fbcon/rotate_all 2>/dev/null
+  echo $PANEL_ROTATE > /sys/class/graphics/fbcon/rotate_all 2>/dev/null
 fi

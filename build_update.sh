@@ -26,6 +26,7 @@ case "$UNIT" in
   g350)      DMUPD_PLATFORM="G350" ;;
   v10)       DMUPD_PLATFORM="V10" ;;
   xumini)    DMUPD_PLATFORM="XUMiniM" ;;
+  e5plus)    DMUPD_PLATFORM="E5Plus" ;;
   *)         DMUPD_PLATFORM="" ;;
 esac
 
