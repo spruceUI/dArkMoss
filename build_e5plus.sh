@@ -110,6 +110,13 @@ fi
 source ./finishing_touches-rk3566.sh
 source ./setup_spruce_handoff.sh
 source ./cleanup_filesystem.sh
+# Wi-Fi needs the out-of-tree RTL8733BS driver in the module index, not just on
+# disk: a stale modules.alias (once restored from another unit's chroot cache)
+# shipped a card whose Wi-Fi never loaded. Stop before any image is made.
+if ! grep -qs ' 8733bs$' Arkbuild/usr/lib/modules/*/modules.alias; then
+  echo "ERROR: 8733bs is not in modules.alias - the E5 Plus would boot with no Wi-Fi."
+  exit 1
+fi
 source ./verify_armhf.sh full
 source ./build_update.sh
 source ./write_rootfs-rk3566.sh
