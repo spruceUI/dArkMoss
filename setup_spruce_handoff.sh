@@ -17,15 +17,13 @@ sudo chmod 0755 Arkbuild/usr/local/sbin/mount-spruce.sh
 sudo cp scripts/spruce/console-blank.sh Arkbuild/usr/local/sbin/console-blank.sh
 sudo chmod 0755 Arkbuild/usr/local/sbin/console-blank.sh
 sudo cp scripts/spruce/spruce-launch.service Arkbuild/etc/systemd/system/spruce-launch.service
-# Opt-in: units whose power-off stalls with fbcon unbound bind it again once spruce lets go of
-# the panel (fbcon-restore.service) and at the very end of the shutdown (its system-shutdown hook).
+# Opt-in: units whose power-off stalls with fbcon unbound bind it again at the very end of the
+# shutdown, from a system-shutdown hook, so nothing on screen changes before the power cut.
 case "$UNIT" in
   g350)
-    sudo cp scripts/spruce/fbcon-restore.service Arkbuild/etc/systemd/system/fbcon-restore.service
     sudo mkdir -p Arkbuild/usr/lib/systemd/system-shutdown
     sudo cp scripts/spruce/fbcon-restore Arkbuild/usr/lib/systemd/system-shutdown/fbcon-restore
     sudo chmod 0755 Arkbuild/usr/lib/systemd/system-shutdown/fbcon-restore
-    sudo chroot Arkbuild/ bash -c "systemctl enable fbcon-restore.service"
     ;;
 esac
 
