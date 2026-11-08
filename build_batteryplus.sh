@@ -26,7 +26,8 @@ sudo cp batteryplus/scripts/batteryplus.sh Arkbuild/usr/local/bin/
 sudo cp batteryplus/systemd/* Arkbuild/etc/systemd/system/
 sudo mkdir -p Arkbuild/etc/batteryplus
 sudo cp --remove-destination batteryplus/config/batteryplus.conf Arkbuild/etc/batteryplus/
-echo "Voltage" | sudo tee Arkbuild/home/ark/.config/.BRMODE
+sudo mkdir -p Arkbuild/home/ark/.config
+echo "Pmic" | sudo tee Arkbuild/home/ark/.config/.BRMODE
 sudo chmod 777 Arkbuild/usr/local/bin/*
 call_chroot "chmod 644 /etc/systemd/system/batteryplus.service"
 call_chroot "systemctl enable batteryplus"

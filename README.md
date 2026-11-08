@@ -69,6 +69,7 @@ Units:
 | v10 | Powkiddy V10 (RK3326) | `make v10` | `build_v10.sh` |
 | pixel2 | GKD Pixel 2 (RK3326S) | `make pixel2` | `build_pixel2.sh` |
 | xumini | MagicX XU Mini M (RK3326) | `make xumini` | `build_xumini.sh` |
+| e5plus | GameMT E5 Plus (RK3566) | `make e5plus` | `build_e5plus.sh` |
 
 pixel2 is not like the other rk3326 units. The GKD Pixel 2 has one card slot, so
 its first boot adds a SPRUCEOS partition on TF1 for spruce. Its PX30S needs the

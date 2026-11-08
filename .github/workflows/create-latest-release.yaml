@@ -47,7 +47,9 @@ jobs:
           while read -r unit; do
             [ -n "$unit" ] || continue
             U="$(tr '[:lower:]' '[:upper:]' <<<"$unit")"
-            grep -qx "dArkMoss_${U}_${VERSION}.dmupd" assets.txt || { echo "::error::no $unit .dmupd for $VERSION"; exit 1; }
+            # build_update.sh names the .dmupd after the unit's SPRUCE_PLATFORM, which differs only here
+            D="$U"; [ "$unit" = xumini ] && D=XUMINIM
+            grep -qx "dArkMoss_${D}_${VERSION}.dmupd" assets.txt || { echo "::error::no $unit .dmupd for $VERSION"; exit 1; }
             grep -qi "${unit}_.*\.img\.7z" assets.txt || { echo "::error::no $unit image"; exit 1; }
           done < .github/units.txt
 

@@ -64,6 +64,7 @@ for patch in ../scripts/kernel-${KERNEL_SRC}/*.patch; do
 done
 # Opt-in fixes from patches/rk3326/kernel: a unit lists only what it was tested with.
 case "$UNIT" in
+  a10mini) KERNEL_OPTIN="no-async-page-flip rk817-gauge-capacity" ;;
   g350)   KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   v10)    KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   xumini) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity rk817-plugin-online" ;;
@@ -82,6 +83,14 @@ if [ "$UNIT" == "g350" ]; then
     verify_action
   done
 fi
+# A10 Mini and V4: 60 Hz panel timing, 3.3 V SD card power.
+if [ "$UNIT" == "a10mini" ]; then
+  for fix in ../patches/a10mini/kernel/*.patch; do
+    git apply -R --check "$fix" 2>/dev/null && continue
+    git apply "$fix"
+    verify_action
+  done
+fi
 make ARCH=arm64 ${DEF_CONFIG}
 if [ -n "$DEF_CONFIG_FRAGMENT" ]; then
   # dArkMoss's 5.10 fixes (build_kernel-rk3566.sh applies the same set).
@@ -94,6 +103,9 @@ if [ -n "$DEF_CONFIG_FRAGMENT" ]; then
   make ARCH=arm64 olddefconfig
   verify_action
 fi
+# FunctionFS for adbd's USB gadget.
+scripts/config --enable USB_CONFIGFS_F_FS
+make ARCH=arm64 olddefconfig
 CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_prepare
 CFLAGS=-Wno-deprecated-declarations make -j$(nproc) ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image dtbs modules
 verify_action
@@ -118,6 +130,19 @@ sudo cp $KERNEL_SRC/arch/arm64/boot/Image ${mountpoint}/
 sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB} ${mountpoint}/
 # The DDR-scaling tree (dmc on, as TwigUI-Next), extlinux.conf's dArkMoss-px30s label.
 [ "$UNIT" == "pixel2" ] && sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/rk3326s-gkd-pixel2-px30s.dtb ${mountpoint}/
+# The V4's dtb, which boot.ini loads when U-Boot picked the V4 panel.
+[ "$UNIT" == "a10mini" ] && sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${CHIPSET}-a10mini-v4-linux.dtb ${mountpoint}/
+if [ "$UNIT" == "v10" ]; then
+  # The v11 dts names an ESP8089 SDIO Wi-Fi chip the V10 does not have. With
+  # this kernel's rkwifi (WL_ROCKCHIP) that node registers a Wi-Fi power switch,
+  # and turning Wi-Fi on froze the V10. Its Wi-Fi is a USB dongle, so the node
+  # goes (tested on a V10: no freeze, dongle connects).
+  if ! command -v fdtput &> /dev/null; then
+    sudo apt -y update
+    sudo apt -y install device-tree-compiler
+  fi
+  sudo fdtput -t s ${mountpoint}/${KERNEL_DTB} /wireless-wlan status disabled
+fi
 if [[ " $UBOOT_OPTIN " == *" uboot-dtb "* ]]; then
   # image_setup.sh's opt-in: U-Boot loads only uboot.dtb, so that is the one U-Boot
   # dtb on BOOT; every unit's dts stays in the U-Boot tree.
@@ -134,10 +159,8 @@ elif [ "$UNIT" == "rgb10" ]; then
   sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB_RGB10S} ${mountpoint}/rk3326-odroidgo2-linux-v11.dtb.rgb10s
 fi
 
-# G350, Mini M: "Loading..." on the console while the initramfs mounts the root (scripts/bootlogo).
-if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ]; then
-  sudo install -D -m 0755 scripts/bootlogo/initramfs-loading Arkbuild/etc/initramfs-tools/scripts/init-top/darkmoss-loading
-fi
+# The G350/Mini M "Loading..." hook is gone; a cached chroot may still carry it.
+sudo rm -f Arkbuild/etc/initramfs-tools/scripts/init-top/darkmoss-loading
 # Create uInitrd from generated initramfs
 sudo cp /usr/bin/qemu-aarch64-static Arkbuild/usr/bin/
 KERNEL_VERSION=$(basename $(find Arkbuild/lib/modules -maxdepth 1 -mindepth 1 -type d))

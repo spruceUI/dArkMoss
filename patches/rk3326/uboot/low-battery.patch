@@ -1,0 +1,14 @@
+Boot down to 3.1 V, near the 3090 mV exit-charge level in this U-Boot's dts. At 3.53 V U-Boot refused to boot on a
+partly charged battery with no charger, and it left no logs because Linux never started.
+
+--- a/board/rockchip/odroidgoa/odroidgoa_power.c
++++ b/board/rockchip/odroidgoa/odroidgoa_power.c
+@@ -10,7 +10,7 @@
+ #include <power/fuel_gauge.h>
+ #include <odroidgoa_status.h>
+ 
+-#define MIN_VOL_LEVEL	3530	/* 3.53V */
++#define MIN_VOL_LEVEL	3100	/* 3.10V */
+ 
+ #define PWR_LED_GPIO	18	/* GPIO0_C2 */
+ #define DC_DET_GPIO	11	/* GPIO0_B3 */

@@ -17,6 +17,15 @@ sudo chmod 0755 Arkbuild/usr/local/sbin/mount-spruce.sh
 sudo cp scripts/spruce/console-blank.sh Arkbuild/usr/local/sbin/console-blank.sh
 sudo chmod 0755 Arkbuild/usr/local/sbin/console-blank.sh
 sudo cp scripts/spruce/spruce-launch.service Arkbuild/etc/systemd/system/spruce-launch.service
+# Opt-in: units whose power-off stalls with fbcon unbound bind it again at the very end of the
+# shutdown, from a system-shutdown hook, so nothing on screen changes before the power cut.
+case "$UNIT" in
+  g350)
+    sudo mkdir -p Arkbuild/usr/lib/systemd/system-shutdown
+    sudo cp scripts/spruce/fbcon-restore Arkbuild/usr/lib/systemd/system-shutdown/fbcon-restore
+    sudo chmod 0755 Arkbuild/usr/lib/systemd/system-shutdown/fbcon-restore
+    ;;
+esac
 
 # spruce expects the card at /mnt/SDCARD; mount-spruce.sh mounts TF2 there.
 sudo mkdir -p Arkbuild/mnt/SDCARD
@@ -164,6 +173,7 @@ case "$UNIT" in
   v10)       HW_DEVICE_NAME="Powkiddy V10" ;;
   pixel2)    HW_DEVICE_NAME="GKD Pixel 2" ;;
   xumini)    HW_DEVICE_NAME="XU Mini M" ;;
+  e5plus)    HW_DEVICE_NAME="GameMT E5 Plus" ;;
   *)         HW_DEVICE_NAME="" ;;
 esac
 if [ -n "$HW_DEVICE_NAME" ] && ! grep -q '^HW_DEVICE=' Arkbuild/etc/os-release 2>/dev/null; then
@@ -184,6 +194,7 @@ case "$UNIT" in
   # unit is a platform of its own, as every other dArkMoss unit is.
   pixel2)    SPRUCE_PLATFORM_NAME="Pixel2DarkMoss" ;;
   xumini)    SPRUCE_PLATFORM_NAME="XUMiniM" ;;
+  e5plus)    SPRUCE_PLATFORM_NAME="E5Plus" ;;
   *)         SPRUCE_PLATFORM_NAME="" ;;
 esac
 if [ -n "$SPRUCE_PLATFORM_NAME" ] && ! grep -q '^SPRUCE_PLATFORM=' Arkbuild/etc/os-release 2>/dev/null; then
@@ -202,13 +213,11 @@ fi
 #     ifupdown has no interfaces file and the V10 has no Wi-Fi chip; NM still
 #     runs for spruce's nmcli and dbus-activates wpa_supplicant if ever needed
 #   keyboard-setup   0.6 s, no keyboard on a handheld
-# fstab: the 4.4 kernel has no compression levels, so "compress=zlib:1" made
-# systemd-remount-fs fail on every boot; plain "zlib" is the same algorithm.
 if [ "$UNIT" == "v10" ]; then
   sudo chroot Arkbuild/ bash -c "systemctl disable welcome-message networking wifi_importer NetworkManager-wait-online wpa_supplicant 2>/dev/null; systemctl mask keyboard-setup.service" || true
-  sudo sed -i 's/compress=zlib:1/compress=zlib/' Arkbuild/etc/fstab
 fi
-# Pixel 2: the same 4.4 fstab fix as the V10.
-if [ "$UNIT" == "pixel2" ]; then
+# fstab: the 4.4 kernel has no compression levels, so "compress=zlib:1" made
+# systemd-remount-fs fail on every boot; plain "zlib" is the same algorithm.
+if [ "$CHIPSET" == "rk3326" ]; then
   sudo sed -i 's/compress=zlib:1/compress=zlib/' Arkbuild/etc/fstab
 fi

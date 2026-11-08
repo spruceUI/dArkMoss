@@ -1,5 +1,6 @@
 #!/bin/bash
 printf "\n"
-printf " * dArkOS Documentation:          https://github.com/christianhaitian/darkos/wiki\n"
+printf " * dArkMoss:                     https://github.com/spruceUI/dArkMoss\n"
+printf " * Based on dArkOS:              https://github.com/christianhaitian/darkos/wiki\n"
 printf " * Debian Reference:             https://www.debian.org/doc/manuals/debian-reference/index.en.html\n"
 printf "\n"

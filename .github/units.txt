@@ -6,3 +6,4 @@ xumini
 rg353m
 v10
 pixel2
+e5plus

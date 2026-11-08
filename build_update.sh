@@ -28,6 +28,7 @@ case "$UNIT" in
   # Same name as setup_spruce_handoff.sh: spruce's "Pixel2" is the Twig-Next base.
   pixel2)    DMUPD_PLATFORM="Pixel2DarkMoss" ;;
   xumini)    DMUPD_PLATFORM="XUMiniM" ;;
+  e5plus)    DMUPD_PLATFORM="E5Plus" ;;
   *)         DMUPD_PLATFORM="" ;;
 esac
 
@@ -120,6 +121,24 @@ done >> "$WORK/verify"
 
 sed -n 's/^CHANGED //p' "$WORK/verify" | canon | sort -u > "$WORK/changed"
 sed -n 's/^MISSING //p' "$WORK/verify" | canon | sort -u | grep -Ev -f "$WORK/exclude" | grep -Ev -f "$WORK/never-remove" > "$WORK/remove.list"
+# Files an earlier dArkMoss build added and this one dropped: no package owns them, so the md5
+# check above cannot see them go.
+cat >> "$WORK/remove.list" <<'EOF'
+/usr/local/sbin/bootlogo-loading.sh
+/etc/systemd/system/bootlogo-loading.service
+/etc/systemd/system/bootlogo-loading-again.service
+/etc/systemd/system/bootlogo-reboot.service
+/etc/systemd/system/bootlogo-poweroff.service
+/etc/systemd/system/sysinit.target.wants/bootlogo-loading.service
+/etc/systemd/system/sysinit.target.wants/bootlogo-loading-again.service
+/etc/systemd/system/reboot.target.wants/bootlogo-reboot.service
+/etc/systemd/system/poweroff.target.wants/bootlogo-poweroff.service
+/etc/systemd/system/halt.target.wants/bootlogo-poweroff.service
+/usr/share/bootlogo/logo-reboot.bmp
+/usr/share/bootlogo/logo-poweroff.bmp
+/etc/initramfs-tools/scripts/init-top/darkmoss-loading
+/boot/logo-boot.bmp
+EOF
 
 sort -u "$WORK/unowned" "$WORK/changed" | grep -Ev -f "$WORK/exclude" | sed 's#^/##' > "$WORK/layer"
 
@@ -202,6 +221,15 @@ if [ "$CHIPSET" != "rk3326" ]; then
   RESOURCE_FILE=resource.img.gz
 fi
 
+# --- loader ------------------------------------------------------------------
+# rk3326: idbloader, U-Boot and trust, sectors 64 up to the boot partition, as
+# flashing the image would write them. rk3566 stays out: empty loader_sha256.
+LOADER_FILE=""
+if [ "$CHIPSET" = "rk3326" ]; then
+  sudo dd if=${DISK} bs=512 skip=64 count=$((SYSTEM_PART_START - 64)) 2>/dev/null | gzip -c > "$WORK/loader.img.gz"
+  LOADER_FILE=loader.img.gz
+fi
+
 # --- assemble ---------------------------------------------------------------
 KVER=$(basename "$(find Arkbuild/usr/lib/modules -maxdepth 1 -mindepth 1 -type d | head -n 1)")
 cat > "$WORK/manifest" <<EOF
@@ -216,6 +244,7 @@ rootfs_sha256=$(sha256sum "$WORK/rootfs.tar.gz" | cut -d' ' -f1)
 packages_sha256=$(sha256sum "$WORK/packages.tar.gz" | cut -d' ' -f1)
 foreign_arches=${FOREIGN_ARCHES}
 resource_sha256=$([ -n "$RESOURCE_FILE" ] && gzip -dc "$WORK/resource.img.gz" | sha256sum | cut -d' ' -f1)
+loader_sha256=$([ -n "$LOADER_FILE" ] && gzip -dc "$WORK/loader.img.gz" | sha256sum | cut -d' ' -f1)
 EOF
 cp scripts/spruce/dmupd-apply.sh "$WORK/apply.sh"
 chmod 0755 "$WORK/apply.sh"
@@ -224,7 +253,7 @@ sudo chown -R "$(id -u):$(id -g)" "$WORK"
 rm -f "$DMUPD"
 # Uncompressed outer tar, manifest first, so the head can be read without
 # touching the rest.
-tar -C "$WORK" --owner=0 --group=0 -cf "$DMUPD" manifest apply.sh remove.list boot.tar.gz rootfs.tar.gz packages.tar.gz $RESOURCE_FILE
+tar -C "$WORK" --owner=0 --group=0 -cf "$DMUPD" manifest apply.sh remove.list boot.tar.gz rootfs.tar.gz packages.tar.gz $RESOURCE_FILE $LOADER_FILE
 
 echo "Update payload: $DMUPD ($(du -h "$DMUPD" | cut -f1))"
 cat "$WORK/manifest"

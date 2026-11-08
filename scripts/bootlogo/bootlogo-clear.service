@@ -1,0 +1,11 @@
+[Unit]
+Description=Clear the boot logo from the console once the frontend has the screen
+ConditionKernelCommandLine=!darkmoss.debug
+After=bootlogo.service sys-kernel-debug.mount
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -I /usr/local/sbin/bootlogo.py --clear
+
+[Install]
+WantedBy=multi-user.target

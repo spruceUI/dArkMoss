@@ -15,7 +15,8 @@ if bc_fetch "$ARM32_CACHE_ASSET" arm32-libs.tar.zst && sudo tar --zstd -xpf arm3
   echo "armhf libraries restored from build cache."
 else
   ( setup_arkbuild32 )
-  if sudo tar --zstd -cf arm32-libs.tar.zst ${ARM32_LIB_DIR}/libSDL2* ${ARM32_LIB_DIR}/librga.so* ${ARM32_LIB_DIR}/libgo2.so*; then
+  if sudo tar --zstd -cf arm32-libs.tar.zst ${ARM32_LIB_DIR}/libSDL2* ${ARM32_LIB_DIR}/librga.so* ${ARM32_LIB_DIR}/libgo2.so* \
+      $(ls Arkbuild/usr/local/share/a10mini/sdl32-* 2>/dev/null); then
     bc_publish "$ARM32_CACHE_ASSET" arm32-libs.tar.zst
   fi
 fi

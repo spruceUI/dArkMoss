@@ -1,0 +1,18 @@
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-a10mini-linux.dts b/arch/arm64/boot/dts/rockchip/rk3326-a10mini-linux.dts
+index 145c008..27e867e 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-a10mini-linux.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-a10mini-linux.dts
+@@ -429,10 +429,10 @@
+ 				clock-frequency = <21000000>;
+ 				hactive = <640>;
+ 				vactive = <480>;
+-				hfront-porch = <48>;
++				hfront-porch = <28>;
+ 				hsync-len = <4>;
+-				hback-porch = <48>;
+-				vfront-porch = <10>;
++				hback-porch = <28>;
++				vfront-porch = <6>;
+ 				vsync-len = <4>;
+ 				vback-porch = <10>;
+ 				hsync-active = <0>;

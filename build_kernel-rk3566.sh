@@ -25,8 +25,27 @@ if [ "$UNIT" = "rgb30" ]; then
   RGB20SX_DTB="rk3566-rgb20sx-3"
   RGB30_TF2="rgb30-tf2-nouhs-1"
 fi
+# The GameMT E5 Plus is not in the upstream kernel tree: its dts and its
+# singleadcjoy patch (switch-rxy / invert-absry for the right stick) live in
+# patches/e5plus/kernel and are added below. Keyed only for this unit, so the
+# other units' cached kernels are untouched.
+E5PLUS_DTS=""
+E5PLUS_PATCHES=()
+# The E5 Plus radio is an RTL8733BS (SDIO 024C:B733), not the RTL8821CS its
+# stock dtb names, and this kernel has no driver for it: build Realtek's
+# vendor driver out of tree, pinned, as a module in the cached kernel output.
+RTL8733BS_REPO=https://github.com/newbie-461/RTL8733BS_WiFi_linux_v5.14.1.1-46.git
+RTL8733BS_COMMIT=4719bf994bc4a80c05cda4cb397ee7a39ecebe15
+RTL8733BS_PATCHES=()
+if [ "$UNIT" = "e5plus" ]; then
+  E5PLUS_DTS="patches/e5plus/kernel/rk3566-e5plus.dts"
+  E5PLUS_PATCHES=(patches/e5plus/kernel/*.patch)
+  RTL8733BS_PATCHES=(patches/e5plus/rtl8733bs/*.patch)
+fi
 KERNEL_CACHE_KEY="$(bc_key "$(bc_remote_sha "$KERNEL_REPO")" \
     "rk3566_optimized_linux_defconfig" "$UNIT" "$UNIT_DTB" "${RGB20SX_DTB:-}" "${RGB30_TF2:-}" \
+    ${E5PLUS_DTS:+"$E5PLUS_DTS"} "${E5PLUS_PATCHES[@]}" \
+    ${RTL8733BS_PATCHES[0]:+"$RTL8733BS_COMMIT"} "${RTL8733BS_PATCHES[@]}" \
     "logos/unrotated/dArkMoss${UNIT}.png" "logos/unrotated/dArkMosshdmi.png" \
     scripts/kernel/*.patch \
     "fmt2")"
@@ -105,6 +124,18 @@ if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$RGB30_TF2" ]; then
     fi
   done
 fi
+if [ "$KERNEL_FROM_CACHE" != "y" ] && [ -n "$E5PLUS_DTS" ]; then
+  cp "../$E5PLUS_DTS" arch/arm64/boot/dts/rockchip/
+  grep -q "rk3566-e5plus.dtb" arch/arm64/boot/dts/rockchip/Makefile || \
+    echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3566-e5plus.dtb" >> arch/arm64/boot/dts/rockchip/Makefile
+  for patch in "${E5PLUS_PATCHES[@]}"; do
+    git apply -R --check "../$patch" 2>/dev/null && continue
+    if ! git apply "../$patch"; then
+      echo "ERROR: $patch did not apply."
+      exit 1
+    fi
+  done
+fi
 if [ "$KERNEL_FROM_CACHE" != "y" ]; then
   for patch in ../scripts/kernel/*.patch; do
     git apply -R --check "$patch" 2>/dev/null && continue
@@ -124,6 +155,25 @@ cd ..
 if [ "$KERNEL_FROM_CACHE" != "y" ]; then
   sudo make -C $KERNEL_SRC ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../Arkbuild modules_install
   sudo cp -Rv $KERNEL_SRC/lib/firmware/ Arkbuild/usr/lib/
+
+  if [ "$UNIT" = "e5plus" ]; then
+    (
+      set -e
+      rm -rf rtl8733bs
+      git clone -q "$RTL8733BS_REPO" rtl8733bs
+      git -C rtl8733bs checkout -q "$RTL8733BS_COMMIT"
+      for patch in "${RTL8733BS_PATCHES[@]}"; do git -C rtl8733bs apply "$PWD/$patch"; done
+      make -C $KERNEL_SRC M="$PWD/rtl8733bs" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- \
+        KCFLAGS=-w CONFIG_RTL8733BS=m -j$(nproc) modules
+      KVER="$(basename "$(ls -d Arkbuild/lib/modules/*/ | head -1)")"
+      sudo install -D -m 0644 rtl8733bs/8733bs.ko "Arkbuild/lib/modules/$KVER/extra/8733bs.ko"
+    )
+    if ! ls Arkbuild/lib/modules/*/extra/8733bs.ko >/dev/null 2>&1; then
+      echo "ERROR: the RTL8733BS driver did not build - the E5 Plus would have no Wi-Fi."
+      exit 1
+    fi
+    rm -rf rtl8733bs
+  fi
 
   echo "Packing the kernel for the build cache..."
   if sudo tar --zstd -cf kernel-cache.tar.zst \
@@ -170,7 +220,12 @@ sudo mkdir -p Arkbuild/lib/firmware/
 # Use rsync to handle symlinks gracefully
 sudo rsync -aL --ignore-errors $KERNEL_SRC/lib/firmware/ Arkbuild/lib/firmware/ 2>/dev/null || \
  sudo cp -rL $KERNEL_SRC/lib/firmware/* Arkbuild/lib/firmware/ 2>/dev/null || true
- 
+if [ "$UNIT" = "e5plus" ]; then
+  # Also in the initrd (below), for btrtl's first attempt early in boot.
+  sudo install -D -m 0644 -t Arkbuild/usr/lib/firmware/rtl_bt/ \
+    firmware/rtl8723fs/rtl8723fs_fw.bin firmware/rtl8723fs/rtl8723fs_config.bin
+fi
+
 # Create uInitrd from generated initramfs
 #sudo cp /usr/bin/qemu-aarch64-static Arkbuild/usr/bin/
 KERNEL_VERSION=$(basename $(find Arkbuild/lib/modules -maxdepth 1 -mindepth 1 -type d))
@@ -213,7 +268,10 @@ done
 # We also need to copy the 5.10 kernel compatible BT firmware files or BT will not initialize correctly
 mkdir -p lib/firmware/rtl_bt/
 # The RGB30 image gets both: the RGB20SX boots it with an RTL8723DS.
-if [[ "$UNIT" != "rgb20pro" ]] && [[ "$UNIT" != *"miniloong"* ]]; then
+if [[ "$UNIT" == "e5plus" ]]; then
+  # RTL8733BS: its Bluetooth core is an RTL8723F (0004 teaches btrtl about it).
+  sudo cp ../firmware/rtl8723fs/rtl8723fs_fw.bin ../firmware/rtl8723fs/rtl8723fs_config.bin lib/firmware/rtl_bt/
+elif [[ "$UNIT" != "rgb20pro" ]] && [[ "$UNIT" != *"miniloong"* ]]; then
   sudo cp ../Arkbuild/usr/lib/firmware/rtl_bt/rtl8821cs_* lib/firmware/rtl_bt/
 fi
 if [[ "$UNIT" == "rgb20pro" ]] || [[ "$UNIT" == *"miniloong"* ]] || [[ "$UNIT" == "rgb30" ]]; then
@@ -251,6 +309,21 @@ if [[ "$UNIT" == "503" ]] || [[ "$UNIT" == *"353"* ]] || [[ "$UNIT" == *"miniloo
   cd ../..
   rm -rf rkbin
   #scripts/mkimg --dtb ${UNIT_DTB}.dtb
+elif [[ "$UNIT" == "e5plus" ]]; then
+  # The E5 Plus gets its own resource.img: U-Boot reads rk-kernel.dtb from it
+  # (charge animation, PMIC, display). The RG503 one below describes another
+  # board: its charge mode parked a reboot-with-USB in a charge screen this
+  # panel cannot show, and its "LCD power" GPIO0_C2 is the left stick light
+  # here. dtb only: U-Boot charge mode is off (the charging screen is
+  # e5plus-offcharge, in Linux), and no logo (a cached kernel tree carries no
+  # logo.bmp).
+  git clone --depth=1 https://github.com/rockchip-linux/rkbin
+  cd rkbin/tools
+  cp ../../arch/arm64/boot/dts/rockchip/${UNIT_DTB}.dtb rk-kernel.dtb
+  ./resource_tool --pack rk-kernel.dtb
+  cp resource.img ../../.
+  cd ../..
+  rm -rf rkbin
 else
   # For some reason, supported PowKiddy rk3566 devices need resource.img
   # generated from the RG503 Kernel source.

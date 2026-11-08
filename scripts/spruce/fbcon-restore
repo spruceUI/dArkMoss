@@ -1,0 +1,5 @@
+#!/bin/sh
+# systemd-shutdown hook ($1 = poweroff, reboot, halt or kexec): binds fbcon again once every process
+# is gone and the filesystems are unmounted, just before the kernel powers off.
+[ "$1" = poweroff ] || exit 0
+exec /usr/local/sbin/console-blank.sh --restore

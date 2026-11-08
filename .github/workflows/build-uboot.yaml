@@ -1,0 +1,82 @@
+# U-Boot (and the unit's extra kernel dtbs) without the rest of the image, for
+# trying bootloader changes on a card that already has dArkMoss: dd the three
+# images at sectors 64 / 16384 / 24576 and copy the dtbs to BOOT. Minutes, not hours.
+
+name: build-uboot
+
+on:
+  workflow_dispatch:
+    inputs:
+      unit:
+        description: "RK3326 unit (Makefile target)"
+        required: true
+        default: "a10mini"
+  push:
+    branches: [a10miniv4]
+    paths: [patches/a10mini/**, .github/workflows/build-uboot.yaml]
+
+jobs:
+  uboot:
+    runs-on: ubuntu-24.04
+    env:
+      UNIT: ${{ inputs.unit || 'a10mini' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore the aarch64 toolchain cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .toolchain-cache
+          key: darkmoss-toolchain-linaro-6.3.1-2017.05
+
+      - name: Install build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex build-essential device-tree-compiler python-is-python3 libssl-dev
+
+      - name: Provision the aarch64 toolchain
+        run: |
+          TCNAME=gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu
+          LOCAL="$PWD/.toolchain-cache/$TCNAME"
+          if [ ! -x "$LOCAL/bin/aarch64-linux-gnu-ld" ]; then
+            mkdir -p .toolchain-cache
+            git clone --depth=1 https://github.com/christianhaitian/${TCNAME}.git "$LOCAL"
+          fi
+          # make.sh only looks in /opt/toolchains.
+          sudo mkdir -p /opt/toolchains
+          sudo ln -sfn "$LOCAL" "/opt/toolchains/$TCNAME"
+
+      - name: Build U-Boot
+        env:
+          CHIPSET: rk3326
+        run: |
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          verify_action() { [ $? -eq 0 ] || exit 1; }
+          # image_setup.sh's U-Boot half, from the clone through make.sh.
+          sed -n '/^# Build uboot and install it to the image/,/^\.\/make\.sh odroidgoa$/p' image_setup.sh > uboot.sh
+          grep -q 'make.sh odroidgoa' uboot.sh
+          set -e
+          source ./uboot.sh
+          mkdir -p ../out
+          cp sd_fuse/idbloader.img sd_fuse/uboot.img sd_fuse/trust.img ../out/
+          cp arch/arm/dts/${UNIT}-uboot.dtb ../out/
+          mv ../out out-uboot
+
+      - name: Build the unit's extra kernel dtbs
+        if: ${{ env.UNIT == 'a10mini' }}
+        run: |
+          git clone --depth=1 --filter=blob:none --sparse -b rg351 https://github.com/christianhaitian/linux.git k
+          git -C k sparse-checkout set include/dt-bindings include/uapi/linux arch/arm64/boot/dts/rockchip arch/arm64/boot/dts/include
+          git -C k apply "$PWD"/patches/a10mini/kernel/*.patch
+          cd k
+          for dts in rk3326-a10mini-v4-linux; do
+            cpp -nostdinc -undef -D__DTS__ -x assembler-with-cpp -I include -I arch/arm64/boot/dts \
+              -I arch/arm64/boot/dts/rockchip -I arch/arm64/boot/dts/include \
+              arch/arm64/boot/dts/rockchip/$dts.dts | dtc -q -I dts -O dtb -o ../u-boot-rk3326/out-uboot/$dts.dtb -
+          done
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: uboot-${{ env.UNIT }}
+          path: u-boot-rk3326/out-uboot/

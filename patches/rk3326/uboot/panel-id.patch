@@ -2,6 +2,7 @@ Panel-ID check (opt-in): a DSI panel node with "id" (and optional "id-reg", defa
 reads the panel's ID before its init sequence. When the ID matches a sibling panel node's "id", the
 display is torn down and rebuilt once from that node: its commands, delays and timings. Without an
 "id" property nothing changes. The detected ID and node land in env panel_id / panel_node.
+When the switch changes the mode, lcd_init (the ODROID logo path) re-sizes its framebuffer and plane.
 
 diff -ruN a/drivers/video/drm/rockchip_display.c b/drivers/video/drm/rockchip_display.c
 --- a/drivers/video/drm/rockchip_display.c	2026-10-10 21:25:09
@@ -90,7 +91,7 @@ diff -ruN a/drivers/video/drm/rockchip_panel.c b/drivers/video/drm/rockchip_pane
  	struct udevice *power_supply;
  	struct udevice *backlight;
  	struct gpio_desc enable_gpio;
-@@ -273,6 +282,54 @@
+@@ -273,6 +282,60 @@
  	return 0;
  }
  
@@ -110,10 +111,16 @@ diff -ruN a/drivers/video/drm/rockchip_panel.c b/drivers/video/drm/rockchip_pane
 +	u8 id[sizeof(plat->id)];
 +	int i, len;
 +
-+	mipi_dsi_set_maximum_return_packet_size(dsi, plat->id_len);
-+	ret = mipi_dsi_dcs_read(dsi, plat->id_reg, id, plat->id_len);
++	for (i = 0; i < 5; i++) {
++		mipi_dsi_set_maximum_return_packet_size(dsi, plat->id_len);
++		ret = mipi_dsi_dcs_read(dsi, plat->id_reg, id, plat->id_len);
++		if (ret == plat->id_len)
++			break;
++		printf("panel: ID read %d failed (%d)\n", i + 1, (int)ret);
++		mdelay(20);
++	}
 +	if (ret != plat->id_len) {
-+		printf("panel: ID read failed (%d), keeping %s\n", (int)ret, name);
++		printf("panel: ID read failed, keeping %s\n", name);
 +		return false;
 +	}
 +
@@ -314,3 +321,87 @@ diff -ruN a/drivers/video/drm/rockchip_panel.h b/drivers/video/drm/rockchip_pane
  
  struct rockchip_panel_funcs {
  	void (*init)(struct rockchip_panel *panel);
+diff -ruN a/drivers/video/drm/rockchip_display_cmds.c b/drivers/video/drm/rockchip_display_cmds.c
+--- a/drivers/video/drm/rockchip_display_cmds.c	2026-10-22 17:10:14.984225363 -0700
++++ b/drivers/video/drm/rockchip_display_cmds.c	2026-10-22 17:10:15.053454724 -0700
+@@ -67,6 +67,34 @@
+ }
+ 
+ /*----------------------------------------------------------------------------*/
++/* The framebuffer and the plane, sized to the panel's current mode */
++static void lcd_setup_plane(void)
++{
++	lcd->w = lcd->s->conn_state.mode.hdisplay;
++	lcd->h = lcd->s->conn_state.mode.vdisplay;
++
++	lcd->drm_fb_mem  = get_drm_memory();
++	lcd->drm_fb_size = (lcd->w * lcd->h * lcd->bpp) >> 3;
++
++	lcd->s->crtc_state.format  = ROCKCHIP_FMT_RGB888;
++#if defined(CONFIG_PLATFORM_ODROID_GOADV)
++	lcd->s->crtc_state.rb_swap = true;
++#else
++	lcd->s->crtc_state.rb_swap = false;
++#endif
++	lcd->s->crtc_state.ymirror = 0;
++	lcd->s->crtc_state.src_w = lcd->s->crtc_state.crtc_w = lcd->w;
++	lcd->s->crtc_state.src_h = lcd->s->crtc_state.crtc_h = lcd->h;
++	lcd->s->crtc_state.src_x = lcd->s->crtc_state.crtc_x = 0;
++	lcd->s->crtc_state.src_y = lcd->s->crtc_state.crtc_y = 0;
++
++	lcd->s->crtc_state.dma_addr = (u32)lcd->drm_fb_mem;
++	lcd->s->crtc_state.xvir =
++		ALIGN(lcd->s->crtc_state.src_w * lcd->bpp, 32) >> 5;
++
++	memset((void *)lcd->drm_fb_mem, 0x00, lcd->drm_fb_size);
++}
++
+ int lcd_init(void)
+ {
+ 	if (lcd != NULL)
+@@ -96,29 +124,7 @@
+ 	lcd->rot = lcd_getrot();
+ 	lcd->bpp = 24;
+ 
+-	lcd->w = lcd->s->conn_state.mode.hdisplay;
+-	lcd->h = lcd->s->conn_state.mode.vdisplay;
+-
+-	lcd->drm_fb_mem  = get_drm_memory();
+-	lcd->drm_fb_size = (lcd->w * lcd->h * lcd->bpp) >> 3;
+-
+-	lcd->s->crtc_state.format  = ROCKCHIP_FMT_RGB888;
+-#if defined(CONFIG_PLATFORM_ODROID_GOADV)
+-	lcd->s->crtc_state.rb_swap = true;
+-#else
+-	lcd->s->crtc_state.rb_swap = false;
+-#endif
+-	lcd->s->crtc_state.ymirror = 0;
+-	lcd->s->crtc_state.src_w = lcd->s->crtc_state.crtc_w = lcd->w;
+-	lcd->s->crtc_state.src_h = lcd->s->crtc_state.crtc_h = lcd->h;
+-	lcd->s->crtc_state.src_x = lcd->s->crtc_state.crtc_x = 0;
+-	lcd->s->crtc_state.src_y = lcd->s->crtc_state.crtc_y = 0;
+-
+-	lcd->s->crtc_state.dma_addr = (u32)lcd->drm_fb_mem;
+-	lcd->s->crtc_state.xvir =
+-		ALIGN(lcd->s->crtc_state.src_w * lcd->bpp, 32) >> 5;
+-
+-	memset((void *)lcd->drm_fb_mem, 0x00, lcd->drm_fb_size);
++	lcd_setup_plane();
+ 
+ 	lcd->fg_color.r = lcd->fg_color.g = lcd->fg_color.b = 0xff;
+ 	lcd->bg_color.r = lcd->bg_color.g = lcd->bg_color.b = 0;
+@@ -127,6 +133,14 @@
+ 
+ 	/* lcd enable */
+ 	set_display_state(lcd->s, true);
++
++	/* The panel-ID check switched panels while enabling: size everything to its mode */
++	if (lcd->s->conn_state.mode.hdisplay != lcd->w ||
++	    lcd->s->conn_state.mode.vdisplay != lcd->h) {
++		lcd_setup_plane();
++		lcd_sync();
++		set_display_state(lcd->s, true);
++	}
+ 	return 0;
+ error:
+ 	printf("LCD initialize fail!\n");

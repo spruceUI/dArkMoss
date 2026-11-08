@@ -30,12 +30,18 @@ rootfs_start=$(cat /sys/block/${primary_block}/${primary_block}p4/start)
 data_start=$(( (rootfs_start + ROOTFS_SECTORS + 2047) / 2048 * 2048 ))
 make_data=0
 [ $((data_start + 2048)) -lt "$disk_sectors" ] && make_data=1
+# The installer may have made SPRUCEOS already: keep it, rootfs up to its start.
+data_part=/sys/block/${primary_block}/${primary_block}p5
+if [ -e "$data_part" ]; then
+	ROOTFS_SECTORS=$(( $(cat "$data_part/start") - rootfs_start ))
+	make_data=2
+fi
 
 exitcode=1
 (
 	echo 10
 	# Either path also moves the backup GPT header to the end of the card.
-	if [ "$make_data" = 1 ]; then
+	if [ "$make_data" != 0 ]; then
 		echo "size=$ROOTFS_SECTORS" | sudo sfdisk -N 4 --no-reread --force /dev/${primary_block} &> /dev/null
 		sudo partx -u -n 4 /dev/${primary_block} &> /dev/null
 	else

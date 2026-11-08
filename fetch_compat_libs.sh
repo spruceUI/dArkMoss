@@ -26,7 +26,7 @@ install_lib() {
 
     # --- ARMHF ---
     if [[ "${BUILD_ARMHF}" == "y" ]]; then
-        local url_armhf="${url//_arm64/_armhf}"
+        local url_armhf="${4:-${url//_arm64/_armhf}}"
         local deb_armhf=$(basename "$url_armhf")
         wget -t 3 -T 60 --no-check-certificate "$url_armhf"
         #verify_action
@@ -43,7 +43,8 @@ install_lib() {
 # libjpeg8 (Debian snapshot, 2014) - PortMaster compatibility
 install_lib \
     "https://snapshot.debian.org/archive/debian-ports/20141009T073751Z/pool-arm64/main/libj/libjpeg8/libjpeg8_8d1-2_arm64.deb" \
-    "libjpeg.so.8" "libjpeg.so.8"
+    "libjpeg.so.8" "libjpeg.so.8" \
+    "https://snapshot.debian.org/archive/debian/20141009T042436Z/pool/main/libj/libjpeg8/libjpeg8_8d1-2_armhf.deb"
 
 # libavcodec58 (FFmpeg 4.3.9, Debian 11 security)
 install_lib \

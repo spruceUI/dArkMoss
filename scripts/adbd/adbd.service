@@ -1,0 +1,14 @@
+[Unit]
+Description=Android Debug Bridge daemon (USB only)
+After=sys-kernel-config.mount systemd-modules-load.service
+
+[Service]
+Type=notify
+ExecCondition=/usr/local/sbin/adbd-gadget.sh check
+ExecStartPre=/usr/local/sbin/adbd-gadget.sh setup
+ExecStart=/usr/lib/android-sdk/platform-tools/adbd
+ExecStartPost=/usr/local/sbin/adbd-gadget.sh activate
+ExecStopPost=/usr/local/sbin/adbd-gadget.sh reset
+
+[Install]
+WantedBy=multi-user.target

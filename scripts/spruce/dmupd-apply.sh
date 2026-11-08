@@ -8,14 +8,14 @@
 # The payload is an uncompressed tar: manifest, apply.sh, remove.list,
 # boot.tar.gz (the boot partition), rootfs.tar.gz (every file the dArkMoss
 # build added to or changed in the Debian rootfs), packages.tar.gz (every
-# package that differs from dmupd-baseline.txt, whole, with its dpkg records)
-# and resource.img.gz (U-Boot's resource partition: dtb, charging animation,
-# power-on logo). Everything is checked against the manifest before anything
-# is written. The rootfs layer and the packages go on first, then the boot
-# files, renamed into place with the previous set kept in /boot/previous, then
+# package that differs from dmupd-baseline.txt, whole, with its dpkg records),
+# resource.img.gz (U-Boot's resource partition: dtb, charging animation,
+# power-on logo) and on rk3326 loader.img.gz (idbloader, U-Boot, trust).
+# Everything is checked against the manifest before anything is written. The
+# rootfs layer and the packages go on first, then the boot files, renamed into place with the previous set kept in /boot/previous, then
 # the resource partition is written whole, so a logo set with the Boot Logo app
-# goes back to stock and that app has to be run again. A reboot afterwards is
-# the caller's job.
+# goes back to stock and that app has to be run again, then the loader. A reboot
+# afterwards is the caller's job.
 
 set -u
 
@@ -56,6 +56,13 @@ if [ -n "$(field resource_sha256)" ]; then
     HAVE_RESOURCE=1
 fi
 
+HAVE_LOADER=0
+if [ -n "$(field loader_sha256)" ]; then
+    GOT="$(tar -xOf "$PAYLOAD" loader.img.gz | gzip -dc | sha256sum | cut -d' ' -f1)"
+    [ "$GOT" = "$(field loader_sha256)" ] || fail "loader.img.gz checksum mismatch"
+    HAVE_LOADER=1
+fi
+
 # The unit is in os-release; images from before the SPRUCE_PLATFORM stamp only
 # carry HW_DEVICE.
 HAVE_PLATFORM="$(sed -n 's/^SPRUCE_PLATFORM="\(.*\)"/\1/p' /etc/os-release)"
@@ -76,6 +83,22 @@ BOOT_NEED_KB="$(tar -xOf "$PAYLOAD" boot.tar.gz | gzip -dc | wc -c)"
 BOOT_NEED_KB=$((BOOT_NEED_KB / 1024 + 1024))
 BOOT_FREE_KB="$(df -k "$BOOT" | awk 'END {print $4}')"
 [ "$BOOT_FREE_KB" -ge "$BOOT_NEED_KB" ] || fail "$BOOT has ${BOOT_FREE_KB}K free, need ${BOOT_NEED_KB}K"
+
+LOADER_OFFSET=32768
+if [ "$HAVE_LOADER" = 1 ]; then
+    LOADER_DISK="$(lsblk -no PKNAME "$(findmnt -no SOURCE "$BOOT")")"
+    [ -b "/dev/$LOADER_DISK" ] || fail "cannot find the disk holding $BOOT"
+    tar -xOf "$PAYLOAD" loader.img.gz | gzip -dc > "$WORK/loader.img" || fail "loader did not extract"
+    LOADER_SIZE="$(wc -c < "$WORK/loader.img")"
+    for part in /sys/block/"$LOADER_DISK"/"$LOADER_DISK"*/start; do
+        [ "$(($(cat "$part") * 512))" -ge "$((LOADER_OFFSET + LOADER_SIZE))" ] \
+            || fail "a partition on $LOADER_DISK overlaps the loader"
+    done
+fi
+loader_matches() {
+    dd if="/dev/$LOADER_DISK" bs=1M iflag=direct,skip_bytes,count_bytes skip="$LOADER_OFFSET" count="$LOADER_SIZE" 2>/dev/null \
+        | cmp -s - "$WORK/loader.img"
+}
 
 # RGB30 image: rgb30versioncheck.sh swaps the dtb on /boot for the v2 board or
 # the RGB20SX at every boot. Note which variant is live now so the same one is
@@ -144,6 +167,15 @@ fi
 # The layer carries the build's enable symlinks; firstboot has already run here.
 systemctl disable firstboot.service >/dev/null 2>&1
 ldconfig
+# ldconfig points each soname link at a file carrying that soname, which is the
+# diverted Mesa copy (libEGL.so.1.1.0.distrib), not libMali.so, so the GL links
+# go back to Mali the way cleanup_filesystem.sh made them.
+for dir in /usr/lib/aarch64-linux-gnu /usr/lib/arm-linux-gnueabihf; do
+    [ -e "$dir/libMali.so" ] || continue
+    for lib in libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so; do
+        ln -sfn libMali.so "$dir/$lib"
+    done
+done
 KVER="$(field kernel)"
 [ -n "$KVER" ] && [ -d "/usr/lib/modules/$KVER" ] && depmod -a "$KVER" 2>/dev/null
 systemctl daemon-reload 2>/dev/null
@@ -171,6 +203,13 @@ if [ "$HAVE_RESOURCE" = 1 ]; then
     tar -xOf "$PAYLOAD" resource.img.gz | gzip -dc | dd of="$RESOURCE_DEV" bs=1M conv=fsync 2>/dev/null \
         || fail "resource partition write failed; the boot files and rootfs are already updated"
     sync
+fi
+
+if [ "$HAVE_LOADER" = 1 ] && ! loader_matches; then
+    say "writing the loader"
+    dd if="$WORK/loader.img" of="/dev/$LOADER_DISK" bs=1M oflag=seek_bytes seek="$LOADER_OFFSET" conv=fsync,notrunc 2>/dev/null \
+        || fail "loader write failed; the boot files and rootfs are already updated"
+    loader_matches || fail "loader did not read back correctly; the boot files and rootfs are already updated"
 fi
 
 say "done: $(sed -n 's/^OS_VERSION=//p' /etc/os-release | tr -d '"') is installed, reboot to run it"

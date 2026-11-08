@@ -25,16 +25,29 @@ if [ "$UNIT" == "rg351mp" ]; then
 else
   INITRD_LOADERADDRESS="0x04000000"
 fi
-# G350: pass U-Boot's panel-ID result to Linux (/proc/cmdline), where a per-panel
+# G350, A10 Mini: pass U-Boot's panel-ID result to Linux (/proc/cmdline), where a per-panel
 # kernel dtb can key on it later.
-if [ "$UNIT" == "g350" ]; then
+if [ "$UNIT" == "g350" ] || [ "$UNIT" == "a10mini" ]; then
   PANEL_ARGS=" panel_id=\${panel_id} panel_node=\${panel_node}"
 else
   PANEL_ARGS=""
 fi
-# G350, Mini M: with /boot/darkmoss-debug, kernel and systemd text on the panel instead of the logos
+# A10 Mini: one image for the A10 Mini and the V4. U-Boot switches to panel@1 when the
+# panel's ID is the V4's (patches/a10mini/uboot); boot that panel's dtb, turned 180 degrees.
+BOOT_ROTATION="${SCREEN_ROTATION}"
+BOOT_DTB="${KERNEL_DTB}"
+PANEL_LINE=""
+if [ "$UNIT" == "a10mini" ]; then
+  BOOT_ROTATION='${fb_rotate}'
+  BOOT_DTB='${dtb_name}'
+  PANEL_LINE="setenv dtb_name \"${KERNEL_DTB}\"
+setenv fb_rotate \"${SCREEN_ROTATION}\"
+if test \"\${panel_node}\" = \"panel@1\"; then setenv dtb_name \"${CHIPSET}-a10mini-v4-linux.dtb\"; setenv fb_rotate \"2\"; fi
+"
+fi
+# G350, Mini M, V10: with /boot/darkmoss-debug, kernel and systemd text on the panel instead of the logos
 # (every bootlogo piece skips itself on darkmoss.debug).
-if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ]; then
+if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "v10" ]; then
   DEBUG_LINE='if test -e mmc 1:1 /darkmoss-debug; then setenv bootargs "${bootargs} console=tty0 loglevel=7 systemd.show_status=1 darkmoss.debug"; fi'
 else
   DEBUG_LINE=""
@@ -54,7 +67,7 @@ fi
 cat <<EOF | sudo tee ${mountpoint}/boot.ini
 odroidgoa-uboot-config
 
-setenv bootargs "root=/dev/mmcblk0p2 rootwait rw fsck.repair=yes net.ifnames=0 fbcon=rotate:${SCREEN_ROTATION} console=/dev/ttyFIQ0 quiet splash consoleblank=0 vt.global_cursor_default=0${PANEL_ARGS}${ROOTFS_ARGS}"
+${PANEL_LINE}setenv bootargs "root=/dev/mmcblk0p2 rootwait rw fsck.repair=yes net.ifnames=0 fbcon=rotate:${BOOT_ROTATION} console=/dev/ttyFIQ0 quiet splash consoleblank=0 vt.global_cursor_default=0${PANEL_ARGS}${ROOTFS_ARGS}"
 ${DEBUG_LINE}
 
 # Booting
@@ -65,7 +78,7 @@ setenv dtb_loadaddr "0x01f00000"
 load mmc 1:1 \${loadaddr} Image
 ${INITRD_LOAD_LINE}
 
-load mmc 1:1 \${dtb_loadaddr} ${KERNEL_DTB}
+load mmc 1:1 \${dtb_loadaddr} ${BOOT_DTB}
 
 ${BOOTI_LINE}
 EOF
@@ -81,12 +94,15 @@ elif [ "$UNIT" == "xumini" ]; then
 elif [ "$UNIT" == "g350" ]; then
   # oakMOSS-style logo from logos/make-logo.py 640 480 (bootlogo.service also shows it).
   sudo cp logos/g350/logo.bmp ${mountpoint}/logo.bmp
+elif [ "$UNIT" == "v10" ]; then
+  # 320x480 portrait panel booted with fbcon=rotate:3: logos/make-logo.py 320 480 --rotate-ccw.
+  sudo cp logos/v10/logo.bmp ${mountpoint}/logo.bmp
 else
   sudo cp logos/unrotated/dArkMoss.bmp ${mountpoint}/logo.bmp
 fi
-# bootlogo.service's redraw: that logo plus oakMOSS's status line (make-logo.py --status).
-if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ]; then
-  sudo cp logos/${UNIT}/logo-boot.bmp logos/${UNIT}/logo-firstboot.bmp ${mountpoint}/
+# bootlogo.service's first-boot redraw: that logo plus "Setting up the card" (make-logo.py --status).
+if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "v10" ]; then
+  sudo cp logos/${UNIT}/logo-firstboot.bmp ${mountpoint}/
 fi
 
 if [ -d "optional" ]; then
@@ -181,11 +197,11 @@ sudo cp amiga/amiga.sh Arkbuild/usr/local/bin/
 if [ "$ROOT_FILESYSTEM_FORMAT" == "btrfs" ]; then
   ROOT_FILESYSTEM_MOUNT_OPTIONS="${ROOT_FILESYSTEM_MOUNT_OPTIONS},ssd_spread"
 fi
-# V10: the 4.4 kernel has no compression levels, so "compress=zlib:1" failed
+# rk3326: the 4.4 kernel has no compression levels, so "compress=zlib:1" failed
 # systemd-remount-fs on every boot; plain "zlib" is the same algorithm. This is
 # the fstab firstboot installs (expandtoexfat), the image's own is fixed in
 # setup_spruce_handoff.sh.
-if [ "$UNIT" == "v10" ] || [ "$UNIT" == "pixel2" ]; then
+if [ "$CHIPSET" == "rk3326" ]; then
   ROOT_FILESYSTEM_MOUNT_OPTIONS="${ROOT_FILESYSTEM_MOUNT_OPTIONS//compress=zlib:1/compress=zlib}"
 fi
 cat <<EOF | sudo tee ${mountpoint}/fstab.exfat
@@ -297,6 +313,22 @@ sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/loca
 # Fix LEDs on A10 Mini to default to the nice dim blue light while powered on
 if [[ "$UNIT" == "a10mini" ]]; then
   sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/fix_power_led &\") | crontab -"
+  # One image for the A10 Mini and the V4 (720x540, upside down): per-panel SDL and boot logo.
+  sudo mkdir -p Arkbuild/usr/local/share/a10mini
+  sudo cp logos/unrotated/dArkMoss.bmp Arkbuild/usr/local/share/a10mini/logo-a10.bmp
+  sudo cp logos/a10mini/logo-v4.bmp Arkbuild/usr/local/share/a10mini/logo-v4.bmp
+  sudo install -D -m 0755 scripts/a10mini/a10mini-panel.sh Arkbuild/usr/local/sbin/a10mini-panel.sh
+  sudo cp scripts/a10mini/a10mini-panel.service Arkbuild/etc/systemd/system/
+  sudo chroot Arkbuild/ bash -c "systemctl enable a10mini-panel.service"
+fi
+
+# Wired adbd. Not on the A10 Mini: its WiFi sits on the only OTG controller.
+sudo install -D -m 0755 scripts/adbd/adbd-gadget.sh Arkbuild/usr/local/sbin/adbd-gadget.sh
+sudo cp scripts/adbd/adbd.service Arkbuild/etc/systemd/system/
+if [[ "$UNIT" != "a10mini" ]]; then
+  sudo chroot Arkbuild/ bash -c "systemctl enable adbd"
+else
+  sudo chroot Arkbuild/ bash -c "systemctl disable adbd"
 fi
 
 # Disable requirement for sudo for setting niceness
@@ -474,19 +506,14 @@ sudo cp scripts/boot_text.sh Arkbuild/usr/local/bin/
 sudo chmod 777 Arkbuild/usr/local/bin/boot_text.sh
 sudo cp scripts/welcome-message.service Arkbuild/etc/systemd/system/welcome-message.service
 sudo chroot Arkbuild/ bash -c "systemctl enable welcome-message"
-# G350, Mini M: the logo stays up instead of the welcome text, which would clear it. bootlogo.service
+# G350, Mini M, V10: the logo stays up instead of the welcome text, which would clear it. bootlogo.service
 # redraws it once the console blanks U-Boot's (upstream's image-viewer logo.service is not built).
-if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ]; then
+if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "v10" ]; then
   sudo chroot Arkbuild/ bash -c "systemctl disable welcome-message"
-  sudo cp scripts/bootlogo/bootlogo.py scripts/bootlogo/bootlogo-loading.sh Arkbuild/usr/local/sbin/
-  sudo chmod 0755 Arkbuild/usr/local/sbin/bootlogo.py Arkbuild/usr/local/sbin/bootlogo-loading.sh
-  sudo cp scripts/bootlogo/bootlogo.service scripts/bootlogo/bootlogo-loading.service scripts/bootlogo/bootlogo-loading-again.service \
-    scripts/bootlogo/bootlogo-reboot.service scripts/bootlogo/bootlogo-poweroff.service Arkbuild/etc/systemd/system/
-  # bootlogo-loading: "Loading..." from systemd's start until the logo; -reboot/-poweroff: the shutdown statuses,
-  # from the rootfs because /boot may already be unmounted when they run.
-  sudo mkdir -p Arkbuild/usr/share/bootlogo
-  sudo cp logos/${UNIT}/logo-reboot.bmp logos/${UNIT}/logo-poweroff.bmp Arkbuild/usr/share/bootlogo/
-  sudo chroot Arkbuild/ bash -c "systemctl enable bootlogo bootlogo-loading bootlogo-loading-again bootlogo-reboot bootlogo-poweroff"
+  sudo cp scripts/bootlogo/bootlogo.py Arkbuild/usr/local/sbin/
+  sudo chmod 0755 Arkbuild/usr/local/sbin/bootlogo.py
+  sudo cp scripts/bootlogo/bootlogo.service scripts/bootlogo/bootlogo-clear.service Arkbuild/etc/systemd/system/
+  sudo chroot Arkbuild/ bash -c "systemctl enable bootlogo bootlogo-clear"
   # The @reboot "perfnorm quiet" (only boot passes "quiet") reset tty1 at ~10 s and wiped the logo.
   sudo sed -i -e '2s/^printf "\\033c" >> \/dev\/tty1$/[ "$1" = quiet ] || &/' \
     -e 's/^  clear > \/dev\/tty1$/  [ "$1" = quiet ] || clear > \/dev\/tty1/' Arkbuild/usr/local/bin/perfnorm

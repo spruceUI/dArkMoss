@@ -1,0 +1,14 @@
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-a10mini-v4-linux.dts b/arch/arm64/boot/dts/rockchip/rk3326-a10mini-v4-linux.dts
+index 1b1074e21..e676e1d55 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-a10mini-v4-linux.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-a10mini-v4-linux.dts
+@@ -855,6 +855,9 @@
+ 			pinctrl-0 = <&i2s1_2ch_mclk>;
+ 			hp-volume = <20>;
+ 			spk-volume = <3>;
++			/* V4: speaker is on an external amplifier, as the vendor dtb sets */
++			use-ext-amplifier;
++			spk-mute-delay-ms = <50>;
+ 			status = "okay";
+ 		};
+ 	};

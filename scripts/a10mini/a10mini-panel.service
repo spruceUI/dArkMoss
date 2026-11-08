@@ -1,0 +1,12 @@
+[Unit]
+Description=Match SDL and the boot logo to the A10 Mini or V4 panel
+RequiresMountsFor=/boot
+After=alsa-restore.service audiopath.service
+Before=spruce-launch.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/a10mini-panel.sh
+
+[Install]
+WantedBy=multi-user.target
