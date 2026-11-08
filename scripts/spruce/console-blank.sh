@@ -22,14 +22,22 @@
 # Match on the device name rather than hardcoding vtcon1: vtcon0 is the dummy
 # console and vtcon1 the framebuffer one on the RGB30, but that numbering is not
 # guaranteed.
+#
+# --restore binds it again at power-off on units that opt in (the fbcon-restore shutdown hook):
+# with fbcon unbound, the G350's power-off stalls for 1-5 minutes in the kernel.
 
-[ -e /boot/darkmoss-debug ] && exit 0
+BIND=0
+if [ "$1" = "--restore" ]; then
+    BIND=1
+elif [ -e /boot/darkmoss-debug ]; then
+    exit 0
+fi
 
 for vtcon in /sys/class/vtconsole/vtcon*; do
     [ -e "$vtcon/name" ] || continue
     case "$(cat "$vtcon/name" 2>/dev/null)" in
         *"frame buffer device"*)
-            echo 0 > "$vtcon/bind" 2>/dev/null
+            echo "$BIND" > "$vtcon/bind" 2>/dev/null
             ;;
     esac
 done
