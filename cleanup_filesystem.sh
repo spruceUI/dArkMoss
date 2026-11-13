@@ -70,7 +70,6 @@ call_chroot "apt remove -y autotools-dev \
   libvpx-dev \
   libvulkan-dev \
   libx11-dev \
-  libx11-xcb1 \
   libxcb-dri2-0 \
   libyaml-dev \
   libzip-dev \
