@@ -197,14 +197,15 @@ if ! grep -q '^OS_VERSION=' Arkbuild/etc/os-release 2>/dev/null; then
   echo "OS_VERSION=\"${DARKMOSS_VERSION:-$BUILD_DATE}\"" | sudo tee -a Arkbuild/etc/os-release >/dev/null
 fi
 
-# V10 boot trims, each measured in a V10 boot log (systemd-analyze blame):
-#   welcome-message  3.1 s in sysinit, everything waits for it (G350 drops it too)
-#   networking, NetworkManager-wait-online, wifi_importer, wpa_supplicant:
-#     ifupdown has no interfaces file and the V10 has no Wi-Fi chip; NM still
-#     runs for spruce's nmcli and dbus-activates wpa_supplicant if ever needed
+# Boot trims, measured with systemd-analyze blame on the V10 and Miniloong:
+#   welcome-message  3.1-3.6 s, prints "Welcome to dArkOS" and sleeps
+#   networking, NetworkManager-wait-online, wifi_importer: ifupdown has no
+#     interfaces file, nothing waits for network-online, spruce owns WiFi setup
 #   keyboard-setup   0.6 s, no keyboard on a handheld
+#   wpa_supplicant (V10 only): no Wi-Fi chip; NM dbus-activates it if ever needed
+sudo chroot Arkbuild/ bash -c "systemctl disable welcome-message networking wifi_importer NetworkManager-wait-online 2>/dev/null; systemctl mask keyboard-setup.service" || true
 if [ "$UNIT" == "v10" ]; then
-  sudo chroot Arkbuild/ bash -c "systemctl disable welcome-message networking wifi_importer NetworkManager-wait-online wpa_supplicant 2>/dev/null; systemctl mask keyboard-setup.service" || true
+  sudo chroot Arkbuild/ bash -c "systemctl disable wpa_supplicant 2>/dev/null" || true
 fi
 # fstab: the 4.4 kernel has no compression levels, so "compress=zlib:1" made
 # systemd-remount-fs fail on every boot; plain "zlib" is the same algorithm.

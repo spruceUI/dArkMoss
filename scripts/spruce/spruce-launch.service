@@ -1,12 +1,13 @@
 [Unit]
 Description=Hand off to spruce on TF2
-# The frontend starts last, after the base system is up. It does NOT depend on
-# a systemd mount unit for the SD - mount-spruce.sh waits for the card itself.
-After=multi-user.target
+# Starts once basic.target and D-Bus are up, without waiting for NetworkManager
+# (spruce reaches it over D-Bus). It does NOT depend on a systemd mount unit
+# for the SD - mount-spruce.sh waits for the card itself.
+After=dbus.service firstboot.service
 Conflicts=emulationstation.service
 
 [Service]
-Type=idle
+Type=simple
 
 # Kill only runtime.sh on stop, not the whole cgroup.
 #
