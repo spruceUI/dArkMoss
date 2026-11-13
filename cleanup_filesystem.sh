@@ -129,6 +129,9 @@ if [[ "$BUILD_BLUEALSA" == "y" ]]; then
   call_chroot "systemctl disable watchforbtaudio bluetooth bluealsa"
 fi
 
+# Before the Mali and SDL2 relinks below: removals run ldconfig, which repoints sonames.
+source ./darkmoss_purge.sh
+
 if [[ "${BUILD_ARMHF}" == "y" ]]; then
   cd Arkbuild/usr/lib/arm-linux-gnueabihf
   for LIB in libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so
