@@ -37,6 +37,8 @@ elif [ "${ROOT_FILESYSTEM_FORMAT}" == "btrfs" ]; then
   done
   #verify_action
   sync Arkbuild
+  # Freed build blocks otherwise reach the image as incompressible data.
+  sudo fstrim -v Arkbuild
   if [[ ! -z $tsize ]]; then
     sudo truncate -s ${tsize}MB ${FILESYSTEM}
   else
