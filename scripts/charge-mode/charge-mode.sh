@@ -5,7 +5,7 @@
 # init-charge before systemd on units with no initramfs) with busybox only: battery level, dark after 30 s,
 # any key wakes, power boots.
 #   charge-mode.sh [FRAMES-DIR]   (default /root/usr/local/share/darkmoss-charge)
-#   exit 0: not a charger power-on, or power key while lit: carry on booting
+#   exit 0: not a charger power-on (no charger online counts), or power key while lit: carry on booting
 #   exit 2: charger gone for 3 s, power off (the caller unmounts and powers off)
 
 FRAMES=${1:-/root/usr/local/share/darkmoss-charge}
@@ -40,7 +40,6 @@ if [ -z "$on" ] || [ -z "$mode" ] || [ $((0x$on & 0xc0)) -ne $((0x40)) ] || [ $(
     log "on=0x${on:-?} boot-mode=${mode:-?}: not a charger power-on"
     exit 0
 fi
-log "on=0x$on boot-mode=$mode: charger power-on"
 
 online() {
     for _o in $PS/*/online; do
@@ -48,6 +47,20 @@ online() {
     done
     return 1
 }
+
+# A reset that bypasses Linux (reset key, watchdog) keeps on=0x40 and the register at 0, so a charger
+# must also be online within 4 s (it can still be detecting this early with no initramfs). Without
+# one the unit boots: powering off here would turn that reset into a power-off.
+n=0
+until online; do
+    n=$((n + 1))
+    if [ "$n" -ge 16 ]; then
+        log "on=0x$on boot-mode=$mode, no charger online: not a charger power-on"
+        exit 0
+    fi
+    usleep 250000
+done
+log "on=0x$on boot-mode=$mode: charger power-on"
 
 BAT=$PS/battery
 for _p in $PS/*; do

@@ -14,8 +14,10 @@ the charger powers it off. It is oakMOSS's charge screen, ported from TwigUI-Nex
   `source: on=` line has bit 6 (plug-in) without bit 7 (power key), and the reboot-mode register
   (PMU_GRF + 0x200: 0xff010200 on RK3326, 0xfdc20200 on RK3566) reads 0. The RK817 keeps the last
   `on=` across a warm reboot (still 0x40 after a reboot on the Mini M), so the register is what
-  tells a reboot from a plug-in. Every other boot returns at once. One line per boot goes to
-  `/var/log/darkmoss-charge.log`.
+  tells a reboot from a plug-in. A charger must also be online within 4 s: a reset that bypasses Linux
+  (reset key, watchdog) keeps `on=0x40` and leaves the register at 0, and without that check the unit
+  would power off 3 s later instead of restarting. Every other boot returns at once. One line per boot
+  goes to `/var/log/darkmoss-charge.log`.
 - `frames/<unit>/`: fb0's own bytes (XRGB8888) per 5 % level, plus `booting` (the unit's boot logo,
   drawn after Power) and `fb` (the size they were made for; another fb0 boots normally). A unit with
   two panels can have a set per fb0 width (`w<width>/`, a `sub` in make-frames.py). Regenerate with
@@ -42,5 +44,6 @@ read: their axis events are more than the shell can follow.
 Seen on hardware (2026-11-06): it works on the V10, RGB30, Miniloong and Mini M. The Miniloong
 ran every step, the unplug power-off included (`charger removed at 92%; powering off`). The A10 Mini
 does not power on at plug-in (every boot it logged is `on=0x80`, the power key), so it is left out;
-the G350 may be the same. Not yet tested: the RG353M. Still open on the other units: the unplug
-power-off and which key nodes wake them.
+the G350 may be the same. Not yet tested: the RG353M, and a reset after a charger start (the
+charger-online rule comes from a code review on 2026-11-14, not from a unit). Still open on the other
+units: the unplug power-off and which key nodes wake them.

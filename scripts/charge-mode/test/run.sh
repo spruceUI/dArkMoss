@@ -178,7 +178,7 @@ for c in "no frames" "stride" "width" "16 bpp"; do
 done
 
 # 6: only a cold plug-in power-on enters: not the power key, a reboot, unread values, or another
-# SoC's register; the RK3566 reads its own.
+# SoC's register; the RK3566 reads its own. (6b: and only with a charger online.)
 for c in "power key:0x80:0x00000000:rk3326" "key and plug:0xc0:0x00000000:rk3326" \
          "warm reboot:0x40:0x5242C300:rk3326" "panic reboot:0x40:0x5242C307:rk3326" \
          "no source line::0x00000000:rk3326" "devmem unread:0x40::rk3326" \
@@ -197,6 +197,23 @@ setup; printf 'miniloong,pocket1\0rockchip,rk3566\0' > fake/compatible; echo 0xf
 start; sleep 1.5
 grep -q "on=0x40 boot-mode=0x00000000: charger power-on" storage/charge.log && ok "rk3566 cold plug-in enters (0xfdc20200)" || bad "rk3566: $(cat storage/charge.log)"
 press 3 116; waitrc 20; finish
+
+# 6b: a cold plug-in power-on also needs a charger online within 4 s (a reset that bypasses Linux
+# keeps on=0x40 and register 0): none -> boot, nothing drawn; one that shows up after 2 s enters.
+setup; echo 0 > sys/class/power_supply/usb/online
+start; sleep 3
+kill -0 "$PID" 2>/dev/null && ok "no charger: still waiting at 3 s" || bad "no charger: gave up before 3 s"
+waitrc 20; finish
+[ "$RC" = 0 ] && [ ! -s storage/draw.log ] && [ ! -e storage/vt.log ] && [ "$(S storage/printk)" = "$(printf '7\t4\t1\t7')" ] \
+  && ok "no charger online -> boot, nothing drawn, console untouched" || bad "no charger -> rc $RC, drew $(wc -l < storage/draw.log 2>/dev/null), vt '$(S storage/vt.log)'"
+grep -q "no charger online: not a charger power-on" storage/charge.log && ok "no charger logged" || bad "no charger log: $(cat storage/charge.log)"
+setup; echo 0 > sys/class/power_supply/usb/online
+start; sleep 2; echo 1 > sys/class/power_supply/usb/online; sleep 2
+grep -q ": charger power-on$" storage/charge.log && [ "$(head -1 storage/draw.log)" = "-c /frames/level-040.raw.gz" ] \
+  && ok "a charger online after 2 s still enters" || bad "late charger: $(cat storage/charge.log)"
+press 3 116; waitrc 20; finish
+[ "$RC" = 0 ] && ok "then power -> exit 0" || bad "rc $RC"
+
 setup; echo "[ 1.5] rk808 0-0020: source: on=0x80, off=0x08" > fake/dmesg
 for i in $(seq 1 1500); do echo "old line $i of the boot log, padded to grow past the cap"; done > storage/charge.log
 start; waitrc 8; finish
