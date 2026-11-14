@@ -27,23 +27,24 @@ the charger powers it off. It is oakMOSS's charge screen, ported from TwigUI-Nex
   the unit's boot logo, with the percentage under it and the hint at the bottom. The RGB30 takes the
   960x720 set (the theme's 720x720 tree is drawn narrower); the V10 the 640x480 set scaled to 320 px.
 - `install.sh`: sourced by `build_kernel.sh` / `build_kernel-rk3566.sh` before update-initramfs. It
-  holds the opt-in list: every CI unit but the A10 Mini, which never powers on at plug-in. Opted-in
-  units also get `rockchip,uboot-charge-on = <0>`, so U-Boot's own animation does not run first: in
-  BOOT's `uboot.dtb` (G350, Mini M) and in the resource partition's `rk-kernel.dtb` on RK3566 (the
+  holds the opt-in list: every CI unit but the A10 Mini and the G350, which never power on at plug-in.
+  Opted-in units also get `rockchip,uboot-charge-on = <0>`, so U-Boot's own animation does not run first:
+  in BOOT's `uboot.dtb` (Mini M) and in the resource partition's `rk-kernel.dtb` on RK3566 (the
   RGB30's cached RG503 resource is unpacked and repacked for it). The V10's U-Boot (u-boot-rk3326)
   takes the animation's dtb and pictures from the board's SPI flash, which no image writes, so its
   BOOT gets a `manufacture` file instead: with it, odroidgoa.c skips `charge_display()`. U-Boot's
   low-battery hold is unchanged everywhere.
 - `test/run.sh`: host test under busybox in bwrap on Linux. `run.sh install` alone (plain bash) runs
   install.sh with each CI unit's `export UNIT=` value: unit names here are those (the RG353M's is `353m`).
-  Its `NOT_IN` list holds the units left out on purpose (the A10 Mini), which must install nothing.
+  Its `NOT_IN` list holds the units left out on purpose (the A10 Mini and the G350), which must install
+  nothing.
 
 Wake keys are the power key and every key-only input node. Joypads that also report sticks are not
 read: their axis events are more than the shell can follow.
 
-Seen on hardware (2026-11-06): it works on the V10, RGB30, Miniloong and Mini M. The Miniloong
+Seen on hardware (2026-11-07): it works on the V10, RGB30, Miniloong and Mini M. The Miniloong
 ran every step, the unplug power-off included (`charger removed at 92%; powering off`). The A10 Mini
-does not power on at plug-in (every boot it logged is `on=0x80`, the power key), so it is left out;
-the G350 may be the same. Not yet tested: the RG353M, and a reset after a charger start (the
+and the G350 do not power on at plug-in (every boot they logged is `on=0x80`, the power key), so they
+are left out. Not yet tested: the RG353M, and a reset after a charger start (the
 charger-online rule comes from a code review on 2026-11-14, not from a unit). Still open on the other
 units: the unplug power-off and which key nodes wake them.
