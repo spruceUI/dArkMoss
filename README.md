@@ -46,17 +46,22 @@ Fraxinus88 for testing and feedback \
 ImCoKeMaN for testing and feedback \
 [PortMaster](https://portmaster.games/) team for support in figuring out PM interface issues
 
-
-
-test webhook.... again......again!
-
 ## dArkMoss
 
 dArkMoss is spruceUI's fork of dArkOS: a Debian base OS on TF1 that hands off to
 [spruce](https://github.com/spruceUI/spruceOS) on TF2. The emulator and
 EmulationStation builds are stripped from the unit build scripts because spruce
-provides all of that from its own card; what is left is debootstrap, the kernel
+provides all of that from its own card; what is left is debootstrap, the kernel,
+the port runtime (SDL2, SDL3, the armhf libraries for 32-bit PortMaster ports)
 and image assembly.
+
+After the build, `darkmoss_purge.sh` removes the compilers and other build-only
+packages listed in `darkmoss_purge_packages.txt` (the build fails if that would
+take out anything in `needed_packages*.txt`), and the rootfs is trimmed before
+it is packed, so the images stay small.
+
+`master` mirrors upstream dArkOS and is fast-forwarded weekly by
+`sync-upstream`. `spruce` takes chosen upstream commits by cherry-pick only.
 
 Units:
 
@@ -64,7 +69,8 @@ Units:
 |---|---|---|---|
 | rgb30 | Powkiddy RGB30 | `make rgb30` | `build_rgb30.sh` |
 | miniloong | Miniloong Pocket 1 | `make miniloong` | `build_miniloong.sh` |
-| a10mini | A10 Mini (RK3326) | `make a10mini` | `build_a10mini.sh` |
+| rg353m | Anbernic RG353M (RK3566) | `make rg353m` | `build_rg353m.sh` |
+| a10mini | A10 Mini and A10 Mini V4 (RK3326) | `make a10mini` | `build_a10mini.sh` |
 | g350 | G350 (RK3326) | `make g350` | `build_g350.sh` |
 | v10 | Powkiddy V10 (RK3326) | `make v10` | `build_v10.sh` |
 | xumini | MagicX XU Mini M (RK3326) | `make xumini` | `build_xumini.sh` |
@@ -75,14 +81,21 @@ Images are built on GitHub Actions, not locally. Under Actions:
 - **build-all** takes a version (`v1.2.3`) and optionally a list of units
   (blank = every unit in `.github/units.txt`), builds them in parallel and
   publishes them as the `beta-<branch>` prerelease. A beta never becomes the
-  latest release, so spruce devices and the installer do not see it.
+  latest release, so spruce devices and the installer do not see it. With
+  `replace` ticked, only the listed units are rebuilt and swapped into the
+  current beta of the same version; use it when one unit fails.
 - **create-latest-release** turns a beta into a draft release tagged with its
   version. It refuses a beta that is missing any unit. Publish the draft by
   hand from the Releases page.
 
-Images ship as `dArkMoss_<UNIT>_<suite>_<date>.img.7z.001`
-and `.002` because a single volume is over GitHub's asset limit; the parts are
-a plain byte split, so `cat` them (or let 7z read `.001`) to extract.
+CI keeps slow, deterministic build steps (the rk3566 kernel, the chroot, armhf libraries,
+SDL3) as assets on the `build-cache` release, keyed by a hash of their inputs
+(`scripts/ci/build-cache.sh`). Any asset there is safe to delete. Local builds
+without a GitHub token skip it and build everything.
+
+Images ship as `dArkMoss_<UNIT>_<suite>_<date>.img.7z.001`. The archive is split
+at 1950 MB to stay under GitHub's asset limit; an image that fits in one part
+still gets the `.001` name. Extract with 7z from `.001`.
 
 Beside each image the build also produces `dArkMoss_<UNIT>_<version>.dmupd`, an
 update payload spruce's Firmware Update app downloads and applies in place: the
@@ -91,7 +104,9 @@ boot partition files, every rootfs file the dArkMoss build added or changed
 resource partition (dtb, charging animation, power-on logo), with the applier
 `scripts/spruce/dmupd-apply.sh` inside. A release carries a `SHA256SUMS` over
 all of its assets, which the app checks the download against. The app only
-reads the latest release, so betas are never offered as updates.
+reads the latest release, so betas are never offered as updates. A `.dmupd`
+adds and replaces files but does not remove packages, so changes like the
+package purge only reach a device through a fresh TF1 flash.
 
 Adding a unit that dArkOS already supports: copy `build_rgb30.sh` (rk3566) or
 `build_g350.sh` (rk3326) to `build_<unit>.sh` and change `UNIT`. On rk3566 add
