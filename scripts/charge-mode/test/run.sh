@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
-# Host test for charge-mode.sh, its initramfs hook and init-charge (Twig-Next's charge-mode test, adapted) under
+# Host test for charge-mode.sh, its initramfs hook and init-charge (TwigUI-Next's charge-mode test, adapted) under
 # busybox ash in bwrap: fake /sys, FIFO key nodes, a file for fb0 and a gunzip stub that logs what
 # is drawn. Needs bwrap + busybox on a Linux host.
 #   test/run.sh [quick]   quick skips the blank/wake case (about 65 s)

@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0
-# Charge screen (the oakMOSS model), ported from Twig-Next's (spruceUI/twigUI-next,
+# Charge screen (the oakMOSS model), ported from TwigUI-Next's (spruceUI/twigUI-next,
 # projects/twigUI/devices/RK3326S/packages/charge-mode). The initramfs runs it (local-bottom/darkmoss-charge;
 # init-charge before systemd on units with no initramfs) with busybox only: battery level, dark after 30 s,
 # any key wakes, power boots.

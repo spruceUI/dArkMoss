@@ -2,7 +2,7 @@
 
 Plugged in while off, the unit boots to a charge screen instead of spruce: the battery level and
 "Charging, press Power to turn on", dark after 30 s, any key wakes it, Power boots, and 3 s without
-the charger powers it off. It is oakMOSS's charge screen, ported from Twig-Next's Pixel 2 version
+the charger powers it off. It is oakMOSS's charge screen, ported from TwigUI-Next's Pixel 2 version
 (spruceUI/twigUI-next `projects/twigUI/devices/RK3326S/packages/charge-mode`, same RK817 PMIC).
 
 - `darkmoss-charge`: initramfs-tools `local-bottom` hook. Once the root is mounted it runs
