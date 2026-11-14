@@ -8,7 +8,7 @@ git config --global http.postBuffer 524288000
 
 # Verify the correct toolchain is available
 OPT_TOOLCHAIN_DIR="/opt/toolchains/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu"
-LOCAL_TOOLCHAIN_DIR="prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu"
+LOCAL_TOOLCHAIN_DIR="${PWD}/prebuilts/gcc/linux-x86/aarch64/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu"
 
 if [ -d "$OPT_TOOLCHAIN_DIR" ]; then
   echo "Using existing system-wide toolchain at $OPT_TOOLCHAIN_DIR"
