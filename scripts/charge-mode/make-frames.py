@@ -46,6 +46,9 @@ UNITS = {
     "miniloong": [dict(fb=(720, 960), turn="ccw", icons="skin_960x720", logo=None)],
     "rgb30": [dict(fb=(720, 720), turn=None, icons="skin_960x720", logo="unrotated/dArkMossrgb30.png")],
     "353m": [dict(fb=(640, 480), turn=None, icons="skin", logo="unrotated/dArkMoss353m.png")],   # the RG353M
+    # One image for the A10 Mini and the V4 (720x540, upside down); a10mini-panel.sh's two logos.
+    "a10mini": [dict(sub="w640", fb=(640, 480), turn=None, icons="skin", logo="unrotated/dArkMoss.bmp"),
+                dict(sub="w720", fb=(720, 540), turn="180", icons="skin_720x540", logo="a10mini/logo-v4.bmp")],
 }
 TEXT = "Charging, press Power to turn on"
 LEVELS = range(0, 101, 5)

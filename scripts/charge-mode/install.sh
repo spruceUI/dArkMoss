@@ -4,10 +4,10 @@
 # BOOT or the resource's rk-kernel.dtb), so the two do not run one after the other.
 # V10 boots with no initramfs: init-charge runs it before systemd instead (finishing_touches.sh's init=).
 # $UNIT as build_<unit>.sh exports it (the RG353M's is 353m); frames/ folders use the same names.
-# Not the A10 Mini: it never powers on at plug-in (every boot it logged is on=0x80, the power key).
-# The G350 logged the same but is in: its screen shows only if it ever does power on at plug-in.
+# The A10 Mini and the G350 are in although every boot they logged is on=0x80 (the power key): their
+# screen shows only if the unit ever does power on at plug-in.
 case "$UNIT" in
-  g350|xumini|v10|miniloong|rgb30|353m) CHARGE_MODE=y ;;
+  g350|xumini|v10|a10mini|miniloong|rgb30|353m) CHARGE_MODE=y ;;
   *) CHARGE_MODE=n ;;
 esac
 
