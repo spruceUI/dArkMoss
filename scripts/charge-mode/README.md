@@ -14,10 +14,12 @@ the charger powers it off. It is oakMOSS's charge screen, ported from TwigUI-Nex
   `source: on=` line has bit 6 (plug-in) without bit 7 (power key), and the reboot-mode register
   (PMU_GRF + 0x200: 0xff010200 on RK3326, 0xfdc20200 on RK3566) reads 0. The RK817 keeps the last
   `on=` across a warm reboot (still 0x40 after a reboot on the Mini M), so the register is what
-  tells a reboot from a plug-in. A charger must also be online within 4 s: a reset that bypasses Linux
-  (reset key, watchdog) keeps `on=0x40` and leaves the register at 0, and without that check the unit
-  would power off 3 s later instead of restarting. Every other boot returns at once. One line per boot
-  goes to `/var/log/darkmoss-charge.log`.
+  tells a reboot from a plug-in. A charger must also stay online for 3 s before anything is drawn: a
+  reset that bypasses Linux (reset key, watchdog) keeps `on=0x40` and leaves the register at 0, and on
+  battery the unit would power off 3 s later instead of restarting. One read is not enough: after such a
+  reset the V10 reads its DC detect online from probe until about 4 s. With no charger for 4 s, or none
+  steady within 10 s, the unit boots. Every other boot returns at once. One line per boot goes to
+  `/var/log/darkmoss-charge.log`; an entry names the supply that was online.
 - `frames/<unit>/`: fb0's own bytes (XRGB8888) per 5 % level, plus `booting` (the unit's boot logo,
   drawn after Power) and `fb` (the size they were made for; another fb0 boots normally). A unit with
   two panels has a set per fb0 width (`a10mini/w640`, `a10mini/w720` for the V4). Regenerate with
@@ -45,6 +47,10 @@ Seen on hardware (2026-11-07): it works on the V10, RGB30, Miniloong and Mini M.
 ran every step, the unplug power-off included (`charger removed at 92%; powering off`). The A10 Mini
 and the G350 have not powered on at plug-in (every boot they logged is `on=0x80`, the power key), so
 charge mode has never run there; they are opted in all the same, and the screen shows only if the unit
-ever does. Not yet tested: the RG353M, and a reset after a charger start (the
-charger-online rule comes from a code review on 2026-11-14, not from a unit). Still open on the other
-units: the unplug power-off and which key nodes wake them.
+ever does.
+
+On 2026-11-14 the Miniloong, Mini M and V10 ran the build before the 3 s rule (a charger online once
+within 4 s): plug-in start, dark and wake, Power and the unplug power-off worked on all three. A reset key
+after a charger start booted normally on the Mini M (`no charger online`) and on the Miniloong (its reset
+gives `on=0x10`); the V10 drew the charge screen and powered off 4 s later, which the 3 s rule is for.
+Not yet tested: the 3 s rule on any unit, and the RG353M.

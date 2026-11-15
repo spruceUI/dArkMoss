@@ -3,7 +3,7 @@
 # Host test for charge-mode.sh, its initramfs hook and init-charge (TwigUI-Next's charge-mode test, adapted) under
 # busybox ash in bwrap: fake /sys, FIFO key nodes, a file for fb0 and a gunzip stub that logs what
 # is drawn. Needs bwrap + busybox on a Linux host.
-#   test/run.sh [quick]   quick skips the blank/wake case (about 65 s)
+#   test/run.sh [quick]   quick skips the blank/wake case (about 70 s)
 #   test/run.sh install   only case 0 (install.sh per unit; plain bash, no bwrap: runs on macOS too)
 set -u
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -120,8 +120,9 @@ S() { cat "$T/root/$1" 2>/dev/null; }
 
 # 1: lit screen, power key boots: level frame first, the boot logo last, governor restored; charge
 # mode runs on VT 2 with console messages muted, and gives both back. Keys: the power key by name,
-# key-only nodes as pads, the joypad with sticks and the keyless headset left out.
-setup; start; sleep 2
+# key-only nodes as pads, the joypad with sticks and the keyless headset left out. (Every case that
+# enters waits 5 s first: the charger has to stay online for 3 s before anything is drawn.)
+setup; start; sleep 5
 [ "$(S storage/vt.log)" = 2 ] && [ "$(S storage/printk)" = 1 ] && ok "on VT 2, console muted" || bad "vt '$(S storage/vt.log)' printk '$(S storage/printk)'"
 [ "$(fbhex)" = "$(rows 2 09)$(rows 2 00)" ] && ok "level-040 drawn at the top of fb0" || bad "fb0 $(fbhex)"
 press 3 116; waitrc 20; finish
@@ -132,17 +133,18 @@ press 3 116; waitrc 20; finish
 [ "$(S storage/vt.log | tr '\n' ' ')" = "2 1 " ] && [ "$(S storage/printk)" = 7 ] && ok "VT 1 and loglevel 7 back" || bad "vt '$(S storage/vt.log | tr '\n' ' ')' printk '$(S storage/printk)'"
 [ "$(S sys/devices/system/cpu/cpufreq/policy0/scaling_governor)" = schedutil ] && ok "governor restored" || bad "governor $(S sys/devices/system/cpu/cpufreq/policy0/scaling_governor)"
 grep -q "power key /dev/input/event0, pads /dev/input/event2$" storage/charge.log && ok "power key by name, key-only pads" || bad "nodes: $(grep charging storage/charge.log)"
+grep -q "boot-mode=0x00000000, usb online: charger power-on$" storage/charge.log && ok "the online supply is logged" || bad "entry: $(head -1 storage/charge.log)"
 
 # 1b: the 4.4 power key name; fb0 panned to its second buffer: frames go there.
 setup; echo rk8xx_pwrkey > sys/class/input/event0/device/name; echo 0,2 > sys/class/graphics/fb0/pan
-start; sleep 1.5
+start; sleep 4.5
 grep -q "power key /dev/input/event0" storage/charge.log && ok "rk8xx_pwrkey found" || bad "nodes: $(cat storage/charge.log)"
 [ "$(fbhex)" = "$(rows 2 00)$(rows 2 09)" ] && ok "drawn at the pan offset" || bad "fb0 $(fbhex)"
 press 3 116; waitrc 20; finish
 [ "$RC" = 0 ] && ok "then power -> exit 0" || bad "rc $RC"
 
 # 2: a pad press while lit does not boot; a level change redraws; charger gone 3 s -> exit 2.
-setup; start; sleep 2
+setup; start; sleep 5
 press 4 115; sleep 1
 echo 47 > sys/class/power_supply/rk817-battery/capacity; sleep 1
 [ "$(tail -1 storage/draw.log)" = "-c /frames/level-045.raw.gz" ] && ok "redraw on level change" || bad "after level change: $(tail -1 storage/draw.log)"
@@ -155,14 +157,15 @@ grep -q "charger removed at 47%" storage/charge.log && ok "logged removal" || ba
 [ "$(tail -1 storage/vt.log)" = 1 ] && [ "$(S storage/printk)" = 7 ] && ok "VT and loglevel back before power off" || bad "vt '$(S storage/vt.log | tr '\n' ' ')' printk '$(S storage/printk)'"
 
 # 3: a blip of the charger shorter than 3 s is ignored.
-setup; start; sleep 2
+setup; start; sleep 5
 echo 0 > sys/class/power_supply/usb/online; sleep 1; echo 1 > sys/class/power_supply/usb/online; sleep 3
 kill -0 "$PID" 2>/dev/null && ok "1 s charger blip ignored" || bad "exited on a blip"
 press 3 116; waitrc 20; finish; [ "$RC" = 0 ] && ok "then power -> exit 0" || bad "rc $RC"
 
 # 4: ac online alone counts; no frames, or frames for another fb0 -> boot at once, nothing drawn.
 setup; echo 1 > sys/class/power_supply/ac/online; echo 0 > sys/class/power_supply/usb/online
-start; sleep 4; kill -0 "$PID" 2>/dev/null && ok "ac online counts" || bad "exited with ac online"
+start; sleep 5; kill -0 "$PID" 2>/dev/null && grep -q ", ac online: charger power-on$" storage/charge.log \
+  && ok "ac online counts" || bad "ac online: $(cat storage/charge.log)"
 press 3 116; waitrc 20; finish
 for c in "no frames" "stride" "width" "16 bpp"; do
   setup
@@ -194,12 +197,13 @@ for c in "power key:0x80:0x00000000:rk3326" "key and plug:0xc0:0x00000000:rk3326
   grep -q "not a charger power-on" storage/charge.log && ok "$what logged" || bad "$what log: $(cat storage/charge.log)"
 done
 setup; printf 'miniloong,pocket1\0rockchip,rk3566\0' > fake/compatible; echo 0xfdc20200 > fake/reg
-start; sleep 1.5
-grep -q "on=0x40 boot-mode=0x00000000: charger power-on" storage/charge.log && ok "rk3566 cold plug-in enters (0xfdc20200)" || bad "rk3566: $(cat storage/charge.log)"
+start; sleep 4.5
+grep -q "on=0x40 boot-mode=0x00000000, usb online: charger power-on" storage/charge.log && ok "rk3566 cold plug-in enters (0xfdc20200)" || bad "rk3566: $(cat storage/charge.log)"
 press 3 116; waitrc 20; finish
 
-# 6b: a cold plug-in power-on also needs a charger online within 4 s (a reset that bypasses Linux
-# keeps on=0x40 and register 0): none -> boot, nothing drawn; one that shows up after 2 s enters.
+# 6b: a cold plug-in power-on also needs a charger that stays online for 3 s (a reset that bypasses
+# Linux keeps on=0x40 and register 0): none for 4 s -> boot, nothing drawn; one that shows up after 2 s
+# enters; one that reads online for 1 s only (the V10 after a reset on battery) or keeps flapping -> boot.
 setup; echo 0 > sys/class/power_supply/usb/online
 start; sleep 3
 kill -0 "$PID" 2>/dev/null && ok "no charger: still waiting at 3 s" || bad "no charger: gave up before 3 s"
@@ -209,10 +213,24 @@ waitrc 20; finish
 grep -q "no charger online: not a charger power-on" storage/charge.log && ok "no charger logged" || bad "no charger log: $(cat storage/charge.log)"
 setup; echo 0 > sys/class/power_supply/usb/online
 start; sleep 2; echo 1 > sys/class/power_supply/usb/online; sleep 2
+[ ! -s storage/draw.log ] && ok "a charger online for 2 s: nothing drawn yet" || bad "drew after 2 s online: $(cat storage/draw.log)"
+sleep 2.5
 grep -q ": charger power-on$" storage/charge.log && [ "$(head -1 storage/draw.log)" = "-c /frames/level-040.raw.gz" ] \
   && ok "a charger online after 2 s still enters" || bad "late charger: $(cat storage/charge.log)"
 press 3 116; waitrc 20; finish
 [ "$RC" = 0 ] && ok "then power -> exit 0" || bad "rc $RC"
+setup
+start; sleep 1.2; echo 0 > sys/class/power_supply/usb/online; waitrc 32; finish
+[ "$RC" = 0 ] && [ ! -s storage/draw.log ] && [ ! -e storage/vt.log ] && [ "$(S storage/printk)" = "$(printf '7\t4\t1\t7')" ] \
+  && ok "online for 1 s only -> boot, nothing drawn, console untouched" || bad "brief charger -> rc $RC, drew $(wc -l < storage/draw.log 2>/dev/null), vt '$(S storage/vt.log)'"
+grep -q ", usb online only briefly: not a charger power-on$" storage/charge.log && ok "brief charger logged" || bad "brief charger log: $(cat storage/charge.log)"
+setup
+start; (cd "$T/root" && for _ in 1 2 3 4 5 6 7; do sleep 1; echo 0 > sys/class/power_supply/usb/online; sleep 1; echo 1 > sys/class/power_supply/usb/online; done) &
+FLAP=$!; sleep 8
+kill -0 "$PID" 2>/dev/null && [ ! -s storage/draw.log ] && ok "flapping charger: still waiting at 8 s, nothing drawn" || bad "flapping: gone or drew before 8 s: $(cat storage/charge.log)"
+waitrc 20; finish; kill "$FLAP" 2>/dev/null; wait "$FLAP" 2>/dev/null
+[ "$RC" = 0 ] && [ ! -s storage/draw.log ] && grep -q ", usb online only briefly: not a charger power-on$" storage/charge.log \
+  && ok "flapping charger -> boot after 10 s, nothing drawn" || bad "flapping -> rc $RC, $(cat storage/charge.log)"
 
 setup; echo "[ 1.5] rk808 0-0020: source: on=0x80, off=0x08" > fake/dmesg
 for i in $(seq 1 1500); do echo "old line $i of the boot log, padded to grow past the cap"; done > storage/charge.log
@@ -242,7 +260,7 @@ hook none; [ "$HRC" = 0 ] && [ -z "$CALLS" ] && ok "hook: no charge-mode.sh -> b
 
 # 8: a unit with two panels: the set for fb0's width (w<width>/), not another width's.
 setup; mkdir frames/w4 frames/w9; mv frames/*.gz frames/fb frames/w4/; cp frames/w4/* frames/w9/
-start; sleep 2
+start; sleep 5
 press 3 116; waitrc 20; finish
 [ "$(head -1 storage/draw.log)" = "-c /frames/w4/level-040.raw.gz" ] && [ "$(tail -1 storage/draw.log)" = "-c /frames/w4/booting.raw.gz" ] \
   && ok "two panels: fb0's width picks w4/" || bad "two panels: $(tr '\n' ' ' < storage/draw.log)"
@@ -253,13 +271,13 @@ start; waitrc 20; finish
 
 # 9: no power key after 5 s: boot (nothing else could), the boot logo drawn, console given back.
 setup; echo "rk817 charger" > sys/class/input/event0/device/name; echo 0 > sys/class/input/event0/device/capabilities/key
-start; waitrc 40; finish
+start; waitrc 52; finish
 [ "$RC" = 0 ] && grep -q "no power key; booting" storage/charge.log && [ "$(tail -1 storage/draw.log)" = "-c /frames/booting.raw.gz" ] \
   && [ "$(S storage/vt.log | tr '\n' ' ')" = "2 1 " ] && [ "$(S storage/printk)" = 7 ] \
   && ok "no power key -> boot logo, exit 0, console back" || bad "no power key: rc $RC, $(tail -1 storage/charge.log)"
 
 # 10: CHARGE_MODE_TMP holds the key readers' files, removed on the way out.
-setup; mkdir storage/run; ENV=(--setenv CHARGE_MODE_TMP /storage/run); start; sleep 2
+setup; mkdir storage/run; ENV=(--setenv CHARGE_MODE_TMP /storage/run); start; sleep 5
 [ -e storage/run/charge-pek ] && [ -e storage/run/charge-pad ] && ok "readers' files in CHARGE_MODE_TMP" || bad "run: $(ls storage/run)"
 press 3 116; waitrc 20; finish; ENV=()
 [ "$RC" = 0 ] && [ -z "$(ls storage/run)" ] && ok "and removed on boot" || bad "rc $RC, left $(ls storage/run)"
@@ -296,7 +314,7 @@ initc none
 # 5: dark after 30 s; the joypad with sticks does not wake it, a pad press does; the power key
 # while dark only wakes; power then boots.
 if [ "${1:-}" != quick ]; then
-  setup; start; sleep 2
+  setup; start; sleep 5.5
   sleep 30
   [ "$(S sys/class/graphics/fb0/blank)" = 4 ] && ok "blank after 30 s" || bad "blank=$(S sys/class/graphics/fb0/blank)"
   press 5 304; sleep 1

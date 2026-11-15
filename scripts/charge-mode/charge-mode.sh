@@ -5,7 +5,7 @@
 # init-charge before systemd on units with no initramfs) with busybox only: battery level, dark after 30 s,
 # any key wakes, power boots.
 #   charge-mode.sh [FRAMES-DIR]   (default /root/usr/local/share/darkmoss-charge)
-#   exit 0: not a charger power-on (no charger online counts), or power key while lit: carry on booting
+#   exit 0: not a charger power-on (no steady charger counts), or power key while lit: carry on booting
 #   exit 2: charger gone for 3 s, power off (the caller unmounts and powers off)
 
 FRAMES=${1:-/root/usr/local/share/darkmoss-charge}
@@ -41,26 +41,33 @@ if [ -z "$on" ] || [ -z "$mode" ] || [ $((0x$on & 0xc0)) -ne $((0x40)) ] || [ $(
     exit 0
 fi
 
+# True while a supply reads online; SUPPLY is its name.
 online() {
     for _o in $PS/*/online; do
-        [ "$(cat "$_o" 2>/dev/null)" = 1 ] && return 0
+        if [ "$(cat "$_o" 2>/dev/null)" = 1 ]; then
+            _o=${_o%/online}; SUPPLY=${_o##*/}
+            return 0
+        fi
     done
     return 1
 }
 
-# A reset that bypasses Linux (reset key, watchdog) keeps on=0x40 and the register at 0, so a charger
-# must also be online within 4 s (it can still be detecting this early with no initramfs). Without
-# one the unit boots: powering off here would turn that reset into a power-off.
-n=0
-until online; do
+# A reset that bypasses Linux (reset key, watchdog) keeps on=0x40 and the register at 0, so a charger must
+# also stay online for 3 s: after such a reset on battery the V10 reads one online until 4 s after start.
+# 4 s offline, or 10 s without a steady one, boots: powering off here would turn the reset into a power-off.
+n=0; up=0; down=0; SUPPLY=""
+while :; do
+    if online; then up=$((up + 1)); down=0; else down=$((down + 1)); up=0; fi
+    [ "$up" -ge 12 ] && break
     n=$((n + 1))
-    if [ "$n" -ge 16 ]; then
-        log "on=0x$on boot-mode=$mode, no charger online: not a charger power-on"
+    if [ "$down" -ge 16 ] || [ "$n" -ge 40 ]; then
+        why="${SUPPLY:-no charger} online${SUPPLY:+ only briefly}"
+        log "on=0x$on boot-mode=$mode, $why: not a charger power-on"
         exit 0
     fi
     usleep 250000
 done
-log "on=0x$on boot-mode=$mode: charger power-on"
+log "on=0x$on boot-mode=$mode, $SUPPLY online: charger power-on"
 
 BAT=$PS/battery
 for _p in $PS/*; do
