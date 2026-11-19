@@ -1,0 +1,15 @@
+[Unit]
+Description=Release the spruce card before it is unmounted
+# Ordering only. Units stop in reverse order, so at shutdown ExecStop finishes before
+# mnt-SDCARD.mount (the mount mount-spruce.sh makes) is stopped.
+After=mnt-SDCARD.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/usr/local/sbin/darkmoss-card-release.sh
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
