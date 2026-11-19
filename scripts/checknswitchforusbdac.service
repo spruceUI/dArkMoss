@@ -1,0 +1,10 @@
+[Unit]
+Description=USB DAC watcher
+After=firstboot.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/checknswitchforusbdac.sh
+
+[Install]
+WantedBy=multi-user.target
