@@ -5,7 +5,7 @@
 # V10 boots with no initramfs: init-charge runs it before systemd instead (finishing_touches.sh's init=).
 # $UNIT as build_<unit>.sh exports it (the RG353M's is 353m); frames/ folders use the same names.
 # Not the G350 or the A10 Mini: no charge screen at plug-in (B370, B371). Not the RG353M: no bench unit
-# to test it. Their frames stay.
+# to test it. Their frames stay. Not the E5 Plus: it has its own (scripts/e5plus/e5plus-offcharge.py).
 case "$UNIT" in
   xumini|v10|miniloong|rgb30) CHARGE_MODE=y ;;
   *) CHARGE_MODE=n ;;

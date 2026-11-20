@@ -29,7 +29,8 @@ the charger powers it off. It is oakMOSS's charge screen, ported from TwigUI-Nex
   the unit's boot logo, with the percentage under it and the hint at the bottom. The RGB30 takes the
   960x720 set (the theme's 720x720 tree is drawn narrower); the V10 the 640x480 set scaled to 320 px.
 - `install.sh`: sourced by `build_kernel.sh` / `build_kernel-rk3566.sh` before update-initramfs. It
-  holds the opt-in list (every CI unit but the G350, the A10 Mini and the RG353M). Opted-in units also
+  holds the opt-in list (every CI unit but the G350, the A10 Mini, the RG353M and the E5 Plus, which
+  has its own charging screen, `scripts/e5plus/e5plus-offcharge.py`). Opted-in units also
   get `rockchip,uboot-charge-on = <0>`, so U-Boot's own animation does not run first: in BOOT's
   `uboot.dtb` (Mini M), and in the resource partition's `rk-kernel.dtb` on RK3566 (the
   RGB30's cached RG503 resource is unpacked and repacked for it). The V10's U-Boot (u-boot-rk3326)
@@ -39,7 +40,7 @@ the charger powers it off. It is oakMOSS's charge screen, ported from TwigUI-Nex
 - `test/run.sh`: host test under busybox in bwrap on Linux. `run.sh install` alone (plain bash) runs
   install.sh with each CI unit's `export UNIT=` value: unit names here are those (the RG353M's is `353m`).
   Its `NOT_IN` list is for units left out on purpose, which must install nothing (the G350, the A10 Mini,
-  the RG353M).
+  the RG353M, the E5 Plus).
 
 Wake keys are the power key and every key-only input node. Joypads that also report sticks are not
 read: their axis events are more than the shell can follow.
