@@ -52,7 +52,7 @@ for patch in ../scripts/kernel-${KERNEL_SRC}/*.patch; do
 done
 # Opt-in fixes from patches/rk3326/kernel: a unit lists only what it was tested with.
 case "$UNIT" in
-  a10mini) KERNEL_OPTIN="no-async-page-flip rk817-gauge-capacity" ;;
+  a10mini) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   g350)   KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   v10)    KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   xumini) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity rk817-plugin-online" ;;
