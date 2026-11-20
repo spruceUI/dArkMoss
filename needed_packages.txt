@@ -3,6 +3,7 @@ alsa-utils
 brightnessctl
 bsdextrautils
 btrfs-progs
+busybox
 ccache
 cloud-guest-utils
 cmake
