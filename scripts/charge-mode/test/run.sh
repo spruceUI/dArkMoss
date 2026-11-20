@@ -25,8 +25,8 @@ install_log() { (cd "$T/inst" && UNIT=$1 bash -c 'sudo() { echo "sudo $*"; }; so
   echo "CHARGE_MODE=$CHARGE_MODE"' 2>&1); }
 HOOK="sudo install -D -m 0755 scripts/charge-mode/darkmoss-charge "
 INITC="sudo install -D -m 0755 scripts/charge-mode/init-charge "
-# CI units left out on purpose (they must install nothing): none now.
-NOT_IN=""
+# CI units left out on purpose (they must install nothing): the G350 (no plug-in start), the RG353M (no bench unit).
+NOT_IN=" g350 353m "
 for u in $(cat "$REPO/.github/units.txt"); do
   unit=$(sed -n 's/^export UNIT=//p' "$REPO/build_$u.sh"); out=$(install_log "$unit"); fr="$REPO/scripts/charge-mode/frames/$unit"
   if [[ "$NOT_IN" == *" $unit "* ]]; then

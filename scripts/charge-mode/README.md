@@ -29,8 +29,9 @@ the charger powers it off. It is oakMOSS's charge screen, ported from TwigUI-Nex
   the unit's boot logo, with the percentage under it and the hint at the bottom. The RGB30 takes the
   960x720 set (the theme's 720x720 tree is drawn narrower); the V10 the 640x480 set scaled to 320 px.
 - `install.sh`: sourced by `build_kernel.sh` / `build_kernel-rk3566.sh` before update-initramfs. It
-  holds the opt-in list (every CI unit). Opted-in units also get `rockchip,uboot-charge-on = <0>`, so
-  U-Boot's own animation does not run first: in BOOT's `uboot.dtb` (G350, Mini M) or
+  holds the opt-in list (every CI unit but the G350 and the RG353M). Opted-in units also get
+  `rockchip,uboot-charge-on = <0>`, so U-Boot's own animation does not run first: in BOOT's
+  `uboot.dtb` (Mini M) or
   `rg351mp-uboot.dtb` (A10 Mini), and in the resource partition's `rk-kernel.dtb` on RK3566 (the
   RGB30's cached RG503 resource is unpacked and repacked for it). The V10's U-Boot (u-boot-rk3326)
   takes the animation's dtb and pictures from the board's SPI flash, which no image writes, so its
@@ -38,19 +39,22 @@ the charger powers it off. It is oakMOSS's charge screen, ported from TwigUI-Nex
   low-battery hold is unchanged everywhere.
 - `test/run.sh`: host test under busybox in bwrap on Linux. `run.sh install` alone (plain bash) runs
   install.sh with each CI unit's `export UNIT=` value: unit names here are those (the RG353M's is `353m`).
-  Its `NOT_IN` list is for units left out on purpose, which must install nothing (none now).
+  Its `NOT_IN` list is for units left out on purpose, which must install nothing (the G350, the RG353M).
 
 Wake keys are the power key and every key-only input node. Joypads that also report sticks are not
 read: their axis events are more than the shell can follow.
 
 Seen on hardware (2026-11-07): it works on the V10, RGB30, Miniloong and Mini M. The Miniloong
 ran every step, the unplug power-off included (`charger removed at 92%; powering off`). The A10 Mini
-and the G350 have not powered on at plug-in (every boot they logged is `on=0x80`, the power key), so
-charge mode has never run there; they are opted in all the same, and the screen shows only if the unit
-ever does.
+has not powered on at plug-in (every boot it logged is `on=0x80`, the power key), so charge mode has
+never run there; it is opted in all the same, and the screen shows only if it ever does. The G350 is left
+out: on 2026-11-19 it showed no charge screen at plug-in on B370 either. The RG353M is left out too: there
+is no bench unit to test it on. `frames/g350` and `frames/353m` stay.
 
 On 2026-11-14 the Miniloong, Mini M and V10 ran the build before the 3 s rule (a charger online once
 within 4 s): plug-in start, dark and wake, Power and the unplug power-off worked on all three. A reset key
 after a charger start booted normally on the Mini M (`no charger online`) and on the Miniloong (its reset
 gives `on=0x10`); the V10 drew the charge screen and powered off 4 s later, which the 3 s rule is for.
-Not yet tested: the 3 s rule on any unit, and the RG353M.
+From 2026-11-14 (V10) to 11-19 the 3 s rule ran on the V10, Miniloong, Mini M and RGB30 (charger starts about
+3 s later than before). After a reset the V10 and Mini M booted with `no charger online` or `ac online only
+briefly`; the Miniloong's and the RGB30's reset gives `on=0x10`, which boots before the rule applies.
