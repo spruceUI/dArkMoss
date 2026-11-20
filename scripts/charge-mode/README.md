@@ -48,7 +48,7 @@ read: their axis events are more than the shell can follow.
 Seen on hardware (2026-11-07): it works on the V10, RGB30, Miniloong and Mini M. The Miniloong
 ran every step, the unplug power-off included (`charger removed at 92%; powering off`). The G350 and the
 A10 Mini are left out: every boot they logged is `on=0x80` (the power key), and on 2026-11-19 neither
-showed a charge screen at plug-in (B370, B371). The RG353M is left out too: there is no bench unit to test
+showed a charge screen at plug-in with charge mode installed. The RG353M is left out too: there is no unit to test
 it on. Their frames stay.
 
 On 2026-11-14 the Miniloong, Mini M and V10 ran the build before the 3 s rule (a charger online once
