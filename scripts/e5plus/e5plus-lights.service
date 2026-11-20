@@ -1,0 +1,10 @@
+[Unit]
+Description=GameMT E5 Plus: restore the stick and button lights
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/e5plus-lights.sh restore
+
+[Install]
+WantedBy=multi-user.target

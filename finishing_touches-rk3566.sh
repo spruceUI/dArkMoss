@@ -5,6 +5,9 @@ sudo mkdir -p ${mountpoint}/extlinux
 
 if [[ "$UNIT" == "miniloong" ]]; then
   ROTATE_HZ=" panel_miniloong_pocket1.preferred_refresh_hz=60 fbcon=rotate:3"
+elif [[ "$UNIT" == "e5plus" ]]; then
+  # 720x1280 portrait panel mounted landscape; stock boots with rotate:1 too.
+  ROTATE_HZ=" fbcon=rotate:1"
 else
   ROTATE_HZ=""
 fi
@@ -73,8 +76,12 @@ sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/loca
 # Set performance governor to ondemand on boot
 sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/perfnorm quiet &\") | crontab -"
 
-# Check for connected headphones on boot
-sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/headphone-audio-switch.sh &\") | crontab -"
+# Check for connected headphones on boot. Not on the E5 Plus: it reads a
+# rk_headset debug message this kernel does not print, so it always picked SPK;
+# e5plus-jackd (e5plus-audio-path.sh) follows the jack instead.
+if [[ "$UNIT" != "e5plus" ]]; then
+  sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/headphone-audio-switch.sh &\") | crontab -"
+fi
 
 # Find and record panel id on boot (for rg353 devices only)
 if [[ "$UNIT" == *"353"* ]]; then
@@ -242,6 +249,29 @@ if [[ "$UNIT" == "miniloong" ]]; then
   sudo chroot Arkbuild/ bash -c "systemctl enable miniloong_led"
 fi
 
+# For GameMT E5 Plus Units Only. The stick light rings and button backlights:
+# a helper the spruce Joystick Lights app (spruceOS App/JoystickLights) calls, and a unit that
+# reapplies the saved choice at boot.
+if [[ "$UNIT" == "e5plus" ]]; then
+  sudo cp scripts/e5plus/e5plus-lights.sh Arkbuild/usr/local/bin/e5plus-lights.sh
+  sudo chmod 755 Arkbuild/usr/local/bin/e5plus-lights.sh
+  sudo cp scripts/e5plus/e5plus-lights.service Arkbuild/etc/systemd/system/e5plus-lights.service
+  sudo chroot Arkbuild/ bash -c "systemctl enable e5plus-lights"
+  # Speaker or headphones, following the jack switch's live level (the
+  # rk_headset extcon misses bounced insertions; see e5plus-audio-path.sh).
+  sudo cp scripts/e5plus/e5plus-audio-path.sh Arkbuild/usr/local/bin/e5plus-audio-path.sh
+  sudo chmod 755 Arkbuild/usr/local/bin/e5plus-audio-path.sh
+  sudo cp scripts/e5plus/e5plus-jackd.service Arkbuild/etc/systemd/system/e5plus-jackd.service
+  sudo chroot Arkbuild/ bash -c "systemctl enable e5plus-jackd"
+  # Charging screen when a charger switched the device on (U-Boot's charge
+  # mode never engages on this board; see e5plus-offcharge.py).
+  sudo install -D -m 0755 scripts/e5plus/e5plus-offcharge.py Arkbuild/usr/local/bin/e5plus-offcharge.py
+  sudo install -D -m 0644 -t Arkbuild/usr/local/share/e5plus-offcharge/ \
+    misc/rk3566/device_off_charging_bmps/e5plus/battery_*.bmp
+  sudo cp scripts/e5plus/e5plus-offcharge.service Arkbuild/etc/systemd/system/e5plus-offcharge.service
+  sudo chroot Arkbuild/ bash -c "systemctl enable e5plus-offcharge"
+fi
+
 # For RGB30 Units Only.  Check for v1 or v2 units and change dtbs due to performance issues.
 # Also provide some battery life status indication
 if [[ "$UNIT" == "rgb30" ]]; then
@@ -268,6 +298,8 @@ fi
 sudo mkdir -p Arkbuild/usr/local/bin
 sudo cp scripts/spktoggle.sh Arkbuild/usr/local/bin/
 sudo chmod 777 Arkbuild/usr/local/bin/spktoggle.sh
+# (On the E5 Plus, spktoggle.sh's SPK_HP is undone within a second by
+# e5plus-jackd, which keeps Playback Path matched to the jack.)
 if [[ "$UNIT" != "rgb20pro" ]]; then
   sudo chroot Arkbuild/ bash -c "(crontab -l 2>/dev/null; echo \"@reboot /usr/local/bin/spktoggle.sh &\") | crontab -"
 else

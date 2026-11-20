@@ -70,7 +70,6 @@ call_chroot "apt remove -y autotools-dev \
   libvpx-dev \
   libvulkan-dev \
   libx11-dev \
-  libx11-xcb1 \
   libxcb-dri2-0 \
   libyaml-dev \
   libzip-dev \
@@ -129,6 +128,9 @@ if [[ "$BUILD_BLUEALSA" == "y" ]]; then
   done <bluetooth_needed_packages.txt
   call_chroot "systemctl disable watchforbtaudio bluetooth bluealsa"
 fi
+
+# Before the Mali and SDL2 relinks below: removals run ldconfig, which repoints sonames.
+source ./darkmoss_purge.sh
 
 if [[ "${BUILD_ARMHF}" == "y" ]]; then
   cd Arkbuild/usr/lib/arm-linux-gnueabihf

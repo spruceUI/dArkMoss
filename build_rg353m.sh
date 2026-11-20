@@ -51,6 +51,7 @@ source ./build_deps.sh
 # explicit ES profile. Ports link SDL2 themselves and cannot be patched one by
 # one, so the fix has to be the library.
 source ./build_sdl2.sh
+source ./build_sdl3.sh
 if [[ "${BUILD_ARMHF}" == "y" ]]; then
   source ./build_arm32_libs.sh
 fi

@@ -1,0 +1,33 @@
+diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
+index 88bbd96ed..05de9b2c0 100644
+--- a/sound/soc/soc-core.c
++++ b/sound/soc/soc-core.c
+@@ -1837,9 +1837,25 @@ static int snd_soc_bind_card(struct snd_soc_card *card)
+ 			goto probe_end;
+ 	}
+ 
+-	/* card bind complete so register a sound card */
+-	ret = snd_card_new(card->dev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1,
+-			card->owner, 0, &card->snd_card);
++	/*
++	 * card bind complete so register a sound card
++	 *
++	 * An optional "linux,snd-card-index" on the card's DT node pins its
++	 * ALSA index. Cards that defer on different components otherwise
++	 * number in whatever order their dependencies happen to resolve,
++	 * and userspace that addresses the codec as card 0 then gets HDMI.
++	 */
++	{
++		int idx = SNDRV_DEFAULT_IDX1;
++		u32 val;
++
++		if (card->dev && card->dev->of_node &&
++		    !of_property_read_u32(card->dev->of_node,
++					  "linux,snd-card-index", &val))
++			idx = val;
++		ret = snd_card_new(card->dev, idx, SNDRV_DEFAULT_STR1,
++				card->owner, 0, &card->snd_card);
++	}
+ 	if (ret < 0) {
+ 		dev_err(card->dev,
+ 			"ASoC: can't create sound card for card %s: %d\n",

@@ -1,0 +1,41 @@
+diff --git a/sound/soc/codecs/rk817_codec.c b/sound/soc/codecs/rk817_codec.c
+index 565c79675..428be709e 100644
+--- a/sound/soc/codecs/rk817_codec.c
++++ b/sound/soc/codecs/rk817_codec.c
+@@ -833,6 +833,36 @@ static int rk817_playback_path_config(struct snd_soc_component *component,
+ 		return -EINVAL;
+ 	}
+ 
++	/*
++	 * The speaker and headphone amp enables are otherwise set only in
++	 * rk817_digital_mute_dac, i.e. when a stream starts. A path change
++	 * while one plays - headphones plugged in during a game - left the
++	 * speaker amp on until the next stream. Match them to the new path now.
++	 */
++	if (snd_soc_component_active(component)) {
++		switch (target_path) {
++		case SPK_PATH:
++		case RING_SPK:
++			rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 1);
++			rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 0);
++			break;
++		case HP_PATH:
++		case HP_NO_MIC:
++		case RING_HP:
++		case RING_HP_NO_MIC:
++			rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 0);
++			rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 1);
++			break;
++		case SPK_HP:
++		case RING_SPK_HP:
++			rk817_codec_ctl_gpio(rk817, CODEC_SET_SPK, 1);
++			rk817_codec_ctl_gpio(rk817, CODEC_SET_HP, 1);
++			break;
++		default:
++			break;
++		}
++	}
++
+ 	return 0;
+ }
+ 

@@ -4,10 +4,6 @@ case $1 in
    pre)
     echo $(cat /sys/class/backlight/backlight/brightness) | sudo tee /var/local/cur_bright.state
     echo 0 | sudo tee /sys/class/backlight/backlight/brightness
-    test=$(top -b -n 1 -d 0.2 -p $(pidof emulationstation) | tail -1 | awk '{print $9}')
-    if (( ${test%.*} > 100 )); then
-      systemctl stop emulationstation
-    fi
     /usr/sbin/alsactl store -f /var/local/asound.state
     if [ -f "/usr/local/bin/quickmode.sh" ]; then
       touch /dev/shm/.JUSTWOKEUP
@@ -26,10 +22,12 @@ case $1 in
     echo $(cat /var/local/cur_bright.state) | sudo tee /sys/class/backlight/backlight/brightness
     sudo sleep_governors.sh RestoreSettingsOnWake
     sudo /usr/sbin/alsactl restore -f /var/local/asound.state
-    if [ ! -f "/dev/shm/QBMODE" ]; then
-      systemctl is-active --quiet emulationstation.service && echo ok || systemctl start emulationstation
+    # The 2 s settle before unmuting the amp and restarting Bluetooth, only
+    # when there is one of those to do: otherwise it just holds up the end of
+    # the wake, and logind refuses any new power action until the wake ends.
+    if [[ -e /dev/shm/.SLEEPMUTED ]] || systemctl is-active --quiet bluetooth.service; then
+      sleep 2
     fi
-    sleep 2
     if [[ -e /dev/shm/.SLEEPMUTED ]]; then
       echo 1 > /sys/class/gpio/gpio16/value
       rm -f /dev/shm/.SLEEPMUTED
@@ -42,7 +40,6 @@ case $1 in
       sudo btconnected.sh reconnect
       sudo rm -f /var/local/btautoreconnect.state
     fi
-	sudo systemctl restart ogage
 	systemctl is-active --quiet killer_daemon && sudo systemctl restart killer_daemon
     exit 0
     ;;

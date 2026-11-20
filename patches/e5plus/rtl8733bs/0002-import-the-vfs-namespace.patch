@@ -1,0 +1,15 @@
+diff --git a/os_dep/linux/os_intfs.c b/os_dep/linux/os_intfs.c
+index 4ecaf8e..967c4b8 100644
+--- a/os_dep/linux/os_intfs.c
++++ b/os_dep/linux/os_intfs.c
+@@ -18,6 +18,10 @@
+ #include <hal_data.h>
+ 
+ MODULE_LICENSE("GPL");
++#if defined(MODULE_IMPORT_NS) && (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
++/* filp_open, kernel_read and kernel_write are exported only to this namespace. */
++MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
++#endif
+ MODULE_DESCRIPTION("Realtek Wireless Lan Driver");
+ MODULE_AUTHOR("Realtek Semiconductor Corp.");
+ MODULE_VERSION(DRIVERVERSION);

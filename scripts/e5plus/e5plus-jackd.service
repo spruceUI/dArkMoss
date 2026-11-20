@@ -1,0 +1,12 @@
+[Unit]
+Description=GameMT E5 Plus: speaker or headphones, following the jack
+After=sound.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/e5plus-audio-path.sh watch
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
