@@ -46,6 +46,15 @@ done
 out=$(install_log 353v)
 grep -qx "CHARGE_MODE=n" <<< "$out" && ! grep -q "sudo install\|sudo cp" <<< "$out" \
   && ok "install.sh: a unit not opted in (353v) installs nothing" || bad "install.sh 353v: $(tr '\n' '|' <<< "$out")"
+# What build_update.sh removes on a unit left out: the entries and every frames file, nothing else.
+out=$(cd "$T/inst" && UNIT=g350 bash -c 'sudo() { :; }; source scripts/charge-mode/install.sh; charge_mode_paths' 2>&1)
+want="/etc/initramfs-tools/scripts/local-bottom/darkmoss-charge /usr/local/lib/darkmoss-charge/charge-mode.sh
+  /usr/local/lib/darkmoss-charge/init-charge /usr/local/share/darkmoss-charge/level-100.raw.gz
+  /usr/local/share/darkmoss-charge/fb /usr/local/share/darkmoss-charge/w720/booting.raw.gz"
+miss=""; for p in $want; do grep -qxF "$p" <<< "$out" || miss="$miss $p"; done
+stray=$(grep -vE '^/(etc/initramfs-tools/scripts/local-bottom/darkmoss-charge|usr/local/(lib|share)/darkmoss-charge/[^ ]+)$' <<< "$out")
+[ -z "$miss" ] && [ -z "$stray" ] && ok "charge_mode_paths: $(wc -l <<< "$out") paths for a unit's update to remove" \
+  || bad "charge_mode_paths: missing [$miss] stray [$(tr '\n' '|' <<< "$stray")]"
 if [ "${1:-}" = install ]; then echo "$fails failure(s)"; [ "$fails" = 0 ]; exit; fi
 
 # mkframe FILE BYTE: a 4x2 XRGB8888 frame (32 bytes) of one byte value, gzipped.

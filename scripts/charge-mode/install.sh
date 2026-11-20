@@ -34,3 +34,12 @@ if [ "$CHARGE_MODE" == "y" ]; then
     sudo apt -y install device-tree-compiler
   fi
 fi
+
+# Every device path this file can install, any unit's frames layout. build_update.sh puts them in
+# remove.list on a unit left out, so an update clears what an earlier build installed.
+charge_mode_paths() {
+  printf '%s\n' /etc/initramfs-tools/scripts/local-bottom/darkmoss-charge \
+    /usr/local/lib/darkmoss-charge/charge-mode.sh /usr/local/lib/darkmoss-charge/init-charge
+  (cd scripts/charge-mode/frames && find . -mindepth 2 \( -type f -o -type l \)) |
+    sed -E 's#^\./[^/]+/#/usr/local/share/darkmoss-charge/#' | sort -u
+}
