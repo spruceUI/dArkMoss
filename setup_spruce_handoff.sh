@@ -17,6 +17,11 @@ sudo chmod 0755 Arkbuild/usr/local/sbin/mount-spruce.sh
 sudo cp scripts/spruce/console-blank.sh Arkbuild/usr/local/sbin/console-blank.sh
 sudo chmod 0755 Arkbuild/usr/local/sbin/console-blank.sh
 sudo cp scripts/spruce/spruce-launch.service Arkbuild/etc/systemd/system/spruce-launch.service
+# At shutdown, ends what still holds the card before its mount stops: spruce-launch stops only
+# runtime.sh, and a plain "systemctl reboot" skips spruce's own shutdown altogether.
+sudo cp scripts/spruce/darkmoss-card-release.sh Arkbuild/usr/local/sbin/darkmoss-card-release.sh
+sudo chmod 0755 Arkbuild/usr/local/sbin/darkmoss-card-release.sh
+sudo cp scripts/spruce/darkmoss-card-release.service Arkbuild/etc/systemd/system/darkmoss-card-release.service
 # Opt-in: units whose power-off stalls with fbcon unbound bind it again at the very end of the
 # shutdown, from a system-shutdown hook, so nothing on screen changes before the power cut.
 case "$UNIT" in
@@ -32,7 +37,7 @@ sudo mkdir -p Arkbuild/mnt/SDCARD
 
 # EmulationStation is not built into dArkMoss, but mask it defensively so
 # nothing can pull it in, and enable our launcher in its place.
-sudo chroot Arkbuild/ bash -c "systemctl mask emulationstation.service 2>/dev/null; systemctl enable spruce-launch.service"
+sudo chroot Arkbuild/ bash -c "systemctl mask emulationstation.service 2>/dev/null; systemctl enable spruce-launch.service darkmoss-card-release.service"
 
 # The spruce SSH account, baked into the image.
 #
