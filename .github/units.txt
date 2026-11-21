@@ -5,4 +5,5 @@ g350
 xumini
 rg353m
 v10
+rg351p
 e5plus

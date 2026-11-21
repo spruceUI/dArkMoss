@@ -1,0 +1,16 @@
+Boot down to 3.4 V, the kernel's own power-off level on units whose dts sets power_off_thresd = <3400> (the
+RG351P). With low-battery.patch's 3.1 V, U-Boot started Linux between 3.1 and 3.4 V and rk817-bat powered it off
+about ten seconds into boot ("battery voltage is under 3400mV ... power off!", seen on an RG351P): a boot that
+dies with no low-battery screen. Here U-Boot shows its low-battery screen instead. Still well under stock 3.53 V.
+
+--- a/board/rockchip/odroidgoa/odroidgoa_power.c
++++ b/board/rockchip/odroidgoa/odroidgoa_power.c
+@@ -10,7 +10,7 @@
+ #include <power/fuel_gauge.h>
+ #include <odroidgoa_status.h>
+ 
+-#define MIN_VOL_LEVEL	3530	/* 3.53V */
++#define MIN_VOL_LEVEL	3400	/* 3.40V */
+ 
+ #define PWR_LED_GPIO	18	/* GPIO0_C2 */
+ #define DC_DET_GPIO	11	/* GPIO0_B3 */

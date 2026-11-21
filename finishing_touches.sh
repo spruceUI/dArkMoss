@@ -26,20 +26,23 @@ setenv fb_rotate \"${SCREEN_ROTATION}\"
 if test \"\${panel_node}\" = \"panel@1\"; then setenv dtb_name \"${CHIPSET}-a10mini-v4-linux.dtb\"; setenv fb_rotate \"2\"; fi
 "
 fi
-# G350, Mini M, V10: with /boot/darkmoss-debug, kernel and systemd text on the panel instead of the logos
+# G350, Mini M, V10, RG351P: with /boot/darkmoss-debug, kernel and systemd text on the panel instead of the logos
 # (every bootlogo piece skips itself on darkmoss.debug).
-if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "v10" ]; then
+if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "v10" ] || [ "$UNIT" == "rg351p" ]; then
   DEBUG_LINE='if test -e mmc 1:1 /darkmoss-debug; then setenv bootargs "${bootargs} console=tty0 loglevel=7 systemd.show_status=1 darkmoss.debug"; fi'
 else
   DEBUG_LINE=""
 fi
 # V10: no initramfs, as Hardkernel's own OGA boot: the rg351 kernel has the SD
 # host and btrfs built in, so the 36 MB ramdisk only added a load, an unpack and
-# a second udev pass (~3 s in a V10 boot log).
-if [ "$UNIT" == "v10" ]; then
+# a second udev pass (~3 s in a V10 boot log). The RG351P boots the same kernel
+# off the same single SD slot.
+if [ "$UNIT" == "v10" ] || [ "$UNIT" == "rg351p" ]; then
   ROOTFS_ARGS=" rootfstype=btrfs"
   # The charge screen runs as PID 1 before systemd here (scripts/charge-mode/init-charge).
-  [ -x Arkbuild/usr/local/lib/darkmoss-charge/init-charge ] &&
+  # V10 only: the RG351P shares this branch but is not a charge-mode unit, and
+  # a chroot-deps cache packed by another rk3326 unit can carry init-charge.
+  [ "$UNIT" == "v10" ] && [ -x Arkbuild/usr/local/lib/darkmoss-charge/init-charge ] &&
     ROOTFS_ARGS="${ROOTFS_ARGS} init=/usr/local/lib/darkmoss-charge/init-charge"
   INITRD_LOAD_LINE=""
   BOOTI_LINE='booti ${loadaddr} - ${dtb_loadaddr}'
@@ -74,8 +77,9 @@ if [ "$UNIT" == "xumini" ]; then
 elif [ "$UNIT" == "g350" ]; then
   # oakMOSS-style logo from logos/make-logo.py 640 480 (bootlogo.service also shows it).
   sudo cp logos/g350/logo.bmp ${mountpoint}/logo.bmp
-elif [ "$UNIT" == "v10" ]; then
+elif [ "$UNIT" == "v10" ] || [ "$UNIT" == "rg351p" ]; then
   # 320x480 portrait panel booted with fbcon=rotate:3: logos/make-logo.py 320 480 --rotate-ccw.
+  # The RG351P's panel is the same 320x480 portrait one, so it shares the V10's logos.
   sudo cp logos/v10/logo.bmp ${mountpoint}/logo.bmp
 else
   sudo cp logos/unrotated/dArkMoss.bmp ${mountpoint}/logo.bmp
@@ -83,6 +87,8 @@ fi
 # bootlogo.service's first-boot redraw: that logo plus "Setting up the card" (make-logo.py --status).
 if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "v10" ]; then
   sudo cp logos/${UNIT}/logo-firstboot.bmp ${mountpoint}/
+elif [ "$UNIT" == "rg351p" ]; then
+  sudo cp logos/v10/logo-firstboot.bmp ${mountpoint}/
 fi
 
 if [ -d "optional" ]; then
@@ -239,7 +245,7 @@ sudo cp dArkOS_Tools/*.sh Arkbuild/opt/system/
 sudo cp dArkOS_Tools/${CHIPSET}/*.sh Arkbuild/opt/system/Advanced/
 sudo cp dArkOS_Tools/Advanced/*.sh Arkbuild/opt/system/Advanced/
 sudo cp scripts/"Enable Quick Mode".sh Arkbuild/opt/system/Advanced/
-if [[ "$UNIT" == *"rgb10"* ]] || [[ "$UNIT" == "v10" ]] || [[ "$UNIT" == "rk2020" ]] || [[ "$UNIT" == *"oga"* ]]; then
+if [[ "$UNIT" == *"rgb10"* ]] || [[ "$UNIT" == "v10" ]] || [[ "$UNIT" == "rg351p" ]] || [[ "$UNIT" == "rk2020" ]] || [[ "$UNIT" == *"oga"* ]]; then
   sudo cp dArkOS_Tools/OGA/*.sh Arkbuild/opt/system/Advanced/
 else
   sudo cp scripts/Switch* Arkbuild/usr/local/bin/
@@ -370,6 +376,16 @@ elif [[ "$UNIT" == "rg351mp" ]] || [[ "$UNIT" == "g350" ]] || [[ "$UNIT" == "a10
   sudo cp device/rg351mp/*.service Arkbuild/etc/systemd/system/
   sudo chroot Arkbuild/ bash -c "systemctl enable 351mp batt_led"
 fi
+# RG351P: power LED on gpio77, same pin and polarity as AmberELEC's RG351P
+# battery.sh (out 0 green, out 1 red). Reuse the rg351mp batt_led service:
+# green, red at <=20%, blinking at <=10%. fix_power_led exports the pin before
+# each start (sleep.rk3326 restarts batt_led on wake). No 351mp.service and no
+# LED-colour menu scripts: spruce is the frontend.
+if [[ "$UNIT" == "rg351p" ]]; then
+  sudo cp device/rg351mp/batt_life_warning.py device/rg351mp/fix_power_led Arkbuild/usr/local/bin/
+  sudo sed '/^ExecStart=/i ExecStartPre=-/usr/local/bin/fix_power_led' device/rg351mp/batt_led.service | sudo tee Arkbuild/etc/systemd/system/batt_led.service >/dev/null
+  sudo chroot Arkbuild/ bash -c "systemctl enable batt_led"
+fi
 
 # Make all scripts in /usr/local/bin executable, world style
 sudo chmod 777 Arkbuild/usr/local/bin/*
@@ -380,7 +396,7 @@ sudo chroot Arkbuild/ bash -c "ln -sfv /roms/themes/ /etc/emulationstation/theme
 
 # Also expose /roms2/themes via the user themes path so ES picks up themes
 # from the second SD card in SD2-for-Roms mode (dangles harmlessly otherwise).
-if [[ "$UNIT" != *"rgb10"* ]] && [[ "$UNIT" != "v10" ]] && [[ "$UNIT" != "rk2020" ]] && [[ "$UNIT" != *"oga"* ]]; then
+if [[ "$UNIT" != *"rgb10"* ]] && [[ "$UNIT" != "v10" ]] && [[ "$UNIT" != "rg351p" ]] && [[ "$UNIT" != "rk2020" ]] && [[ "$UNIT" != *"oga"* ]]; then
   sudo chroot Arkbuild/ bash -c "ln -sfv /roms2/themes/ /home/ark/.emulationstation/themes"
 fi
 
@@ -436,7 +452,7 @@ cat <<EOF | sudo tee -a Arkbuild/etc/samba/smb.conf
    guest ok = yes
    read list = guest
 EOF
-if [[ "$UNIT" != *"rgb10"* ]] && [[ "$UNIT" != "v10" ]] && [[ "$UNIT" != "rk2020" ]] && [[ "$UNIT" != *"oga"* ]]; then
+if [[ "$UNIT" != *"rgb10"* ]] && [[ "$UNIT" != "v10" ]] && [[ "$UNIT" != "rg351p" ]] && [[ "$UNIT" != "rk2020" ]] && [[ "$UNIT" != *"oga"* ]]; then
   cat <<EOF | sudo tee -a Arkbuild/etc/samba/smb.conf
 [roms2]
    comment = ROMS2
@@ -466,9 +482,9 @@ sudo cp scripts/boot_text.sh Arkbuild/usr/local/bin/
 sudo chmod 777 Arkbuild/usr/local/bin/boot_text.sh
 sudo cp scripts/welcome-message.service Arkbuild/etc/systemd/system/welcome-message.service
 sudo chroot Arkbuild/ bash -c "systemctl enable welcome-message"
-# G350, Mini M, V10: the logo stays up instead of the welcome text, which would clear it. bootlogo.service
+# G350, Mini M, V10, RG351P: the logo stays up instead of the welcome text, which would clear it. bootlogo.service
 # redraws it once the console blanks U-Boot's (upstream's image-viewer logo.service is not built).
-if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "v10" ]; then
+if [ "$UNIT" == "g350" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "v10" ] || [ "$UNIT" == "rg351p" ]; then
   sudo chroot Arkbuild/ bash -c "systemctl disable welcome-message"
   sudo cp scripts/bootlogo/bootlogo.py Arkbuild/usr/local/sbin/
   sudo chmod 0755 Arkbuild/usr/local/sbin/bootlogo.py

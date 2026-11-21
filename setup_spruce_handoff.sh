@@ -170,6 +170,7 @@ case "$UNIT" in
   a10mini)   HW_DEVICE_NAME="A10 Mini" ;;
   g350)      HW_DEVICE_NAME="G350" ;;
   v10)       HW_DEVICE_NAME="Powkiddy V10" ;;
+  rg351p)    HW_DEVICE_NAME="Anbernic RG351P" ;;
   xumini)    HW_DEVICE_NAME="XU Mini M" ;;
   e5plus)    HW_DEVICE_NAME="GameMT E5 Plus" ;;
   *)         HW_DEVICE_NAME="" ;;
@@ -188,6 +189,7 @@ case "$UNIT" in
   a10mini)   SPRUCE_PLATFORM_NAME="A10Mini" ;;
   g350)      SPRUCE_PLATFORM_NAME="G350" ;;
   v10)       SPRUCE_PLATFORM_NAME="V10" ;;
+  rg351p)    SPRUCE_PLATFORM_NAME="RG351P" ;;
   xumini)    SPRUCE_PLATFORM_NAME="XUMiniM" ;;
   e5plus)    SPRUCE_PLATFORM_NAME="E5Plus" ;;
   *)         SPRUCE_PLATFORM_NAME="" ;;
@@ -207,10 +209,52 @@ fi
 #   networking, NetworkManager-wait-online, wifi_importer: ifupdown has no
 #     interfaces file, nothing waits for network-online, spruce owns WiFi setup
 #   keyboard-setup   0.6 s, no keyboard on a handheld
-#   wpa_supplicant (V10 only): no Wi-Fi chip; NM dbus-activates it if ever needed
+#   wpa_supplicant (V10 and RG351P): no Wi-Fi chip (the RG351P takes only a USB
+#     dongle); NM dbus-activates it if ever needed
 sudo chroot Arkbuild/ bash -c "systemctl disable welcome-message networking wifi_importer NetworkManager-wait-online 2>/dev/null; systemctl mask keyboard-setup.service" || true
-if [ "$UNIT" == "v10" ]; then
+if [ "$UNIT" == "v10" ] || [ "$UNIT" == "rg351p" ]; then
   sudo chroot Arkbuild/ bash -c "systemctl disable wpa_supplicant 2>/dev/null" || true
+fi
+# RG351P: the pad is a USB HID device, "OpenSimHardware OSH PB Controller"
+# (1209:3100), that also declares a keyboard collection (the kernel logs it as
+# "USB HID v1.11 Keyboard"). systemd's input_id (257) sees its keyboard keys
+# (LEFTCTRL, CAPSLOCK, NUMLOCK, INSERT...) and decides it is "a keyboard, not a
+# joystick", so ID_INPUT_JOYSTICK is never set. RetroArch's udev joypad driver
+# and SDL's joystick scan only open devices udev calls joysticks: the menus
+# (which read the node directly) worked and every game had no controls. ArkOS's
+# older udev had no such heuristic. Restore the joystick tag after input_id
+# (60-input-id.rules) has run.
+if [ "$UNIT" == "rg351p" ]; then
+  cat <<'EOF' | sudo tee Arkbuild/etc/udev/rules.d/70-rg351p-joypad.rules >/dev/null
+# dArkMoss: the RG351P's internal pad is a joystick, not a keyboard.
+SUBSYSTEM=="input", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="3100", ENV{ID_INPUT_JOYSTICK}="1", ENV{ID_INPUT_KEYBOARD}=""
+ACTION=="add", SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="3100", RUN+="/usr/local/bin/rg351p-norepeat $devnode"
+EOF
+  # The same keyboard collection makes hid-input set EV_REP, so a held button
+  # also sends value-2 repeats (~33 ms) that scripts matching "key N" without a
+  # value treat as fresh presses. Turn autorepeat off on the pad itself
+  # (EVIOCSREP delay=0 period=0); the rule above re-runs it on every
+  # re-enumeration, resume included. SDL/RetroArch/PyUI never need value 2.
+  cat <<'EOF' | sudo tee Arkbuild/usr/local/bin/rg351p-norepeat >/dev/null
+#!/usr/bin/python3 -I
+# Disable kernel autorepeat (EVIOCSREP delay=0 period=0) on the RG351P pad; its HID keyboard collection makes hid-input set EV_REP.
+import fcntl, struct, sys
+with open(sys.argv[1], 'rb') as f:
+    fcntl.ioctl(f, 0x40084503, struct.pack('II', 0, 0))
+EOF
+  sudo chmod 755 Arkbuild/usr/local/bin/rg351p-norepeat
+  # Headphones: spktoggle.sh (@reboot cron) sets 'Playback Path' SPK_HP, then
+  # restores the seeded /var/local/asound.state, whose SPK put the first boot
+  # back to speaker only. Seed SPK_HP, the path spruce sets.
+  sudo sed -i "/name 'Playback Path'/{n;s/value SPK$/value SPK_HP/}" Arkbuild/var/local/asound.state
+  if ! grep -A1 "name 'Playback Path'" Arkbuild/var/local/asound.state | grep -q "value SPK_HP$"; then
+    echo "setup_spruce_handoff: could not seed 'Playback Path' SPK_HP in asound.state" >&2
+    exit 1
+  fi
+  # Wi-Fi (USB dongle only): power save off; it adds latency and drops
+  # connections on these dongles.
+  sudo mkdir -p Arkbuild/etc/NetworkManager/conf.d
+  printf '[connection]\nwifi.powersave = 2\n' | sudo tee Arkbuild/etc/NetworkManager/conf.d/rg351p-wifi-powersave.conf >/dev/null
 fi
 # fstab: the 4.4 kernel has no compression levels, so "compress=zlib:1" made
 # systemd-remount-fs fail on every boot; plain "zlib" is the same algorithm.

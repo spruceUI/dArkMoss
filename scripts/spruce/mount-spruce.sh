@@ -9,8 +9,26 @@ say() {
   printf '\033[2J\033[H\n\n  %s\n' "$1" > "$TTY" 2>/dev/null
 }
 
+# The block device / is mounted from. Booted without an initramfs (V10,
+# RG351P), the kernel mounts the rootfs itself through a /dev/root node that
+# only ever existed in its own early rootfs, and btrfs keeps reporting that
+# name: findmnt says /dev/root, which is not in /dev, so lsblk found no root
+# disk. The boot card then looked like "another card", only its BOOT partition
+# was tried, and SPRUCEOS on the same card never was. Fall back to root= from
+# the kernel command line.
+root_source() {
+  src=$(findmnt -no SOURCE / 2>/dev/null | sed 's/\[.*//')
+  if [ ! -b "$src" ]; then
+    src=$(sed -n 's/.*\(^\| \)root=\([^ ]*\).*/\2/p' /proc/cmdline)
+    case "$src" in
+      UUID=*|PARTUUID=*|LABEL=*) src=$(findfs "$src" 2>/dev/null) ;;
+    esac
+  fi
+  echo "$src"
+}
+
 candidates() {
-  root_disk=$(lsblk -no PKNAME "$(findmnt -no SOURCE / | sed 's/\[.*//')" 2>/dev/null)
+  root_disk=$(lsblk -no PKNAME "$(root_source)" 2>/dev/null)
   boot_dev=$(findmnt -no SOURCE /boot 2>/dev/null)
   for dev in /sys/block/mmcblk*; do
     disk=${dev##*/}

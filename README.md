@@ -73,6 +73,7 @@ Units:
 | a10mini | A10 Mini and A10 Mini V4 (RK3326) | `make a10mini` | `build_a10mini.sh` |
 | g350 | G350 (RK3326) | `make g350` | `build_g350.sh` |
 | v10 | Powkiddy V10 (RK3326) | `make v10` | `build_v10.sh` |
+| rg351p | Anbernic RG351P (RK3326) | `make rg351p` | `build_rg351p.sh` |
 | xumini | MagicX XU Mini M (RK3326) | `make xumini` | `build_xumini.sh` |
 | e5plus | GameMT E5 Plus (RK3566) | `make e5plus` | `build_e5plus.sh` |
 
