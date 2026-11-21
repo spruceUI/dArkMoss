@@ -81,7 +81,7 @@ jobs:
       # them on a "v10" branch of <owner>/spruceOS; when that branch exists they
       # are attached as spruce-V10-overlay.zip. Without it this step is a no-op.
       - name: Check out (release notes)
-        if: ${{ contains(needs.plan.outputs.units, '"v10"') }}
+        if: ${{ contains(needs.plan.outputs.units, '"v10"') || contains(needs.plan.outputs.units, '"rg351p"') }}
         uses: actions/checkout@v4
         with:
           path: src
@@ -107,6 +107,12 @@ jobs:
           rm -rf spruce-src
           unzip -l spruce-V10-overlay.zip | tail -1
           cat src/.github/v10-overlay-note.md >> v10-notes.md
+
+      # The RG351P also shares one card with spruce, whose releases carry its
+      # files: add its install steps to the notes.
+      - name: RG351P notes
+        if: ${{ contains(needs.plan.outputs.units, '"rg351p"') }}
+        run: cp src/.github/rg351p-release-notes.md rg351p-notes.md
 
       - name: Checksums
         run: |
@@ -157,6 +163,7 @@ jobs:
           Units: $(jq -r 'join(" ")' <<<"$UNITS")
           EOF
           [ -f v10-notes.md ] && cat v10-notes.md >> notes.md
+          [ -f rg351p-notes.md ] && cat rg351p-notes.md >> notes.md
           extra=(); [ -f spruce-V10-overlay.zip ] && extra=(spruce-V10-overlay.zip)
           gh release create "$TAG" *.img.7z* *.dmupd "${extra[@]}" SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \

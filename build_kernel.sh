@@ -17,12 +17,16 @@ else
   DEF_CONFIG="rg351p_tweaked_defconfig"
   if [ "$UNIT" == "xumini" ]; then
     SCREEN_ROTATION="1"
-  elif [ "$UNIT" == "v10" ]; then
-    # 320x480 portrait panel, as the OGA kernel boots it (rgb10 above).
+  elif [ "$UNIT" == "v10" ] || [ "$UNIT" == "rg351p" ]; then
+    # 320x480 portrait panel, as the OGA kernel boots it (rgb10 above). The
+    # RG351P's panel is the same 320x480 portrait one.
     SCREEN_ROTATION="3"
   else
     SCREEN_ROTATION="0"
   fi
+  # RG351P: rk3326-rg351p-linux.dtb from rg351 itself. Not the V10's OGA 1.1
+  # dtb: that one holds GPIO0_B7 high as an always-on USB host supply, and on
+  # the RG351P GPIO0_B7 is the rumble motor (pwm0), so the motor ran nonstop.
   KERNEL_DTB="${CHIPSET}-${UNIT}-linux.dtb"
   # V10: no dts of its own; rg351 carries the OGA 1.1 one dArkOS boots it with.
   [ "$UNIT" == "v10" ] && KERNEL_DTB="${CHIPSET}-odroidgo2-linux-v11.dtb"
@@ -55,6 +59,7 @@ case "$UNIT" in
   a10mini) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   g350)   KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   v10)    KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
+  rg351p) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity" ;;
   xumini) KERNEL_OPTIN="no-async-page-flip vt-csi-ignore rk817-gauge-capacity rk817-plugin-online" ;;
   *)      KERNEL_OPTIN="" ;;
 esac

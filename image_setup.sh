@@ -16,7 +16,8 @@ sync
 
 
 # Build uboot and install it to the image
-if [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "g350" ] || [ "$UNIT" == "a10mini" ] || [ "$UNIT" == "xumini" ]; then
+# RG351P: RG351MP-u-boot carries rg351p-uboot.dts (the RG351 family U-Boot).
+if [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "g350" ] || [ "$UNIT" == "a10mini" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "rg351p" ]; then
   git clone --depth=1 https://github.com/christianhaitian/RG351MP-u-boot u-boot-${CHIPSET}
 else
   git clone --depth=1 https://github.com/christianhaitian/u-boot-${CHIPSET}
@@ -50,11 +51,14 @@ fi
 # uboot-dtb: U-Boot loads uboot.dtb, whatever hwrev reads; build_kernel.sh ships it.
 # panel-id: read the panel's ID and switch to the sibling panel node it names.
 # low-battery: boot down to 3.1 V instead of 3.53 V.
+# low-battery-3v4: boot down to 3.4 V, for a unit whose kernel dts powers off below 3.4 V.
 case "$UNIT" in
   g350)   UBOOT_OPTIN="uboot-dtb panel-id low-battery" ;;
   a10mini) UBOOT_OPTIN="panel-id low-battery" ;;
   xumini) UBOOT_OPTIN="uboot-dtb low-battery" ;;
   v10)    UBOOT_OPTIN="low-battery" ;;
+  # The RG351P's dts powers off below 3.4 V (power_off_thresd), so U-Boot stops there too.
+  rg351p) UBOOT_OPTIN="uboot-dtb low-battery-3v4" ;;
   *)      UBOOT_OPTIN="" ;;
 esac
 for fix in $UBOOT_OPTIN; do
@@ -66,7 +70,7 @@ done
 dd if="sd_fuse/idbloader.img" of="../${DISK}" bs=512 seek=64 conv=sync,noerror,notrunc
 dd if="sd_fuse/uboot.img" of="../${DISK}" bs=512 seek=16384 conv=sync,noerror,notrunc
 dd if="sd_fuse/trust.img" of="../${DISK}" bs=512 seek=24576 conv=sync,noerror,notrunc
-if [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "g350" ] || [ "$UNIT" == "a10mini" ] || [ "$UNIT" == "xumini" ]; then
+if [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "g350" ] || [ "$UNIT" == "a10mini" ] || [ "$UNIT" == "xumini" ] || [ "$UNIT" == "rg351p" ]; then
   cp arch/arm/dts/${UNIT}-uboot.dtb /tmp/
 fi
 cd ..

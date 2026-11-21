@@ -12,7 +12,10 @@ height="20"
 width="60"
 
 primary_block=mmcblk0
-partition_type=$(df -T | grep mmcblk0p2 | cut -d ' ' -f 2)
+# findmnt, not "df -T | grep mmcblk0p2": booted without an initramfs (V10,
+# RG351P) the rootfs shows as /dev/root, the grep found nothing, and the rootfs
+# was never grown ("Don't know how to grow a  file system").
+partition_type=$(findmnt -no FSTYPE /)
 
 ROOTFS_SECTORS=$((11 * 1024 * 1024 * 2))
 disk_sectors=$(cat /sys/block/${primary_block}/size)
@@ -58,6 +61,16 @@ exitcode=1
 		sudo partx -a -n 3 /dev/${primary_block} &> /dev/null
 		sleep 2
 		sudo mkfs.vfat -F 32 -n SPRUCEOS /dev/${primary_block}p3 &> /dev/null || echo 1 > /tmp/code.txt
+	fi
+	# RG351P only for now, so other rk3326 units keep their behaviour; the .DEVICE test can go to make it fleet-wide.
+	if [ "$make_data" = 2 ] && [ "$(cat /home/ark/.config/.DEVICE 2>/dev/null)" = "RG351P" ]; then
+		# A run cut short after the append but before mkfs left p3 raw; a re-run took this path and never formatted it.
+		# Format only a partition with no filesystem signature, so a real SPRUCEOS (or any user filesystem) is never wiped.
+		# blkid -p exits 2 only when it finds nothing; an ambivalent probe (8, also empty output) is left alone.
+		sudo blkid -p -s TYPE -o value /dev/${primary_block}p3 &> /dev/null
+		if [ $? -eq 2 ]; then
+			sudo mkfs.vfat -F 32 -n SPRUCEOS /dev/${primary_block}p3 &> /dev/null || echo 1 > /tmp/code.txt
+		fi
 	fi
 	echo 80
 	sync

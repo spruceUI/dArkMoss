@@ -25,6 +25,7 @@ case "$UNIT" in
   a10mini)   DMUPD_PLATFORM="A10Mini" ;;
   g350)      DMUPD_PLATFORM="G350" ;;
   v10)       DMUPD_PLATFORM="V10" ;;
+  rg351p)    DMUPD_PLATFORM="RG351P" ;;
   xumini)    DMUPD_PLATFORM="XUMiniM" ;;
   e5plus)    DMUPD_PLATFORM="E5Plus" ;;
   *)         DMUPD_PLATFORM="" ;;
