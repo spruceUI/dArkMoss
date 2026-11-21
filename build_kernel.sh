@@ -117,18 +117,38 @@ if [ "$UNIT" == "v10" ]; then
     sudo apt -y install device-tree-compiler
   fi
   sudo fdtput -t s ${mountpoint}/${KERNEL_DTB} /wireless-wlan status disabled
+  # The SD card runs at 1.8 V (SDR104); on a reboot the V10's U-Boot then failed to read it. With
+  # supports-emmc the kernel sets it back to 3.3 V at shutdown (sd.c _mmc_sd_shutdown; tested on a V10).
+  sudo fdtput ${mountpoint}/${KERNEL_DTB} /dwmmc@ff370000 supports-emmc
+  verify_action
 fi
+source scripts/charge-mode/install.sh
 if [[ " $UBOOT_OPTIN " == *" uboot-dtb "* ]]; then
   # image_setup.sh's opt-in: U-Boot loads only uboot.dtb, so that is the one U-Boot
   # dtb on BOOT; every unit's dts stays in the U-Boot tree.
   sudo cp /tmp/${UNIT}-uboot.dtb ${mountpoint}/uboot.dtb
   sudo rm /tmp/${UNIT}-uboot.dtb
+  if [ "$CHARGE_MODE" == "y" ]; then
+    sudo fdtput -t u ${mountpoint}/uboot.dtb /charge-animation rockchip,uboot-charge-on 0
+    verify_action
+  fi
 elif [ "$UNIT" == "rg351mp" ] || [ "$UNIT" == "a10mini" ]; then
   sudo cp /tmp/${UNIT}-uboot.dtb ${mountpoint}/rg351mp-uboot.dtb
   sudo rm /tmp/${UNIT}-uboot.dtb
+  if [ "$CHARGE_MODE" == "y" ]; then
+    sudo fdtput -t u ${mountpoint}/rg351mp-uboot.dtb /charge-animation rockchip,uboot-charge-on 0
+    verify_action
+  fi
 elif [ "$UNIT" == "rgb10" ]; then
   sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB_ALT} ${mountpoint}/rk3326-odroidgo2-linux-v11.dtb.oga11
   sudo cp $KERNEL_SRC/arch/arm64/boot/dts/rockchip/${KERNEL_DTB_RGB10S} ${mountpoint}/rk3326-odroidgo2-linux-v11.dtb.rgb10s
+fi
+# V10: U-Boot reads its charge animation's dtb from the SPI flash, which no image writes. A
+# "manufacture" file on BOOT makes the board code skip the animation (u-boot-rk3326 odroidgoa.c).
+if [ "$UNIT" == "v10" ] && [ "$CHARGE_MODE" == "y" ]; then
+  echo "dArkMoss charge mode: U-Boot skips its own charge animation while this file is here." |
+    sudo tee ${mountpoint}/manufacture > /dev/null
+  verify_action
 fi
 
 # The G350/Mini M "Loading..." hook is gone; a cached chroot may still carry it.
