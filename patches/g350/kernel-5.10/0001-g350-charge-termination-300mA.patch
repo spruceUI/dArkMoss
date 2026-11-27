@@ -1,0 +1,14 @@
+rk3326-g350-linux: stop charging at 300 mA, BatleXP's own value (its SPI device tree);
+52 mA was carried over from the RG351V.
+
+--- a/arch/arm64/boot/dts/rockchip/rk3326-g350-linux.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-g350-linux.dts
+@@ -804,7 +804,7 @@
+ 			max_chrg_current = <2000>;
+ 			max_chrg_voltage = <4200>;
+ 			chrg_term_mode = <0>;
+-			chrg_finish_cur = <52>;
++			chrg_finish_cur = <300>;
+ 			virtual_power = <0>;
+ 			sample_res = <10>;
+ 

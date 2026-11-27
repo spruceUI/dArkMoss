@@ -12,6 +12,8 @@ if [[ "${BUILD_ARMHF}" == "y" ]]; then
   if [ "$1" != "base" ]; then
     _armhf_files="${_armhf_files} ${_armhf_dir}/libGLESv2.so.2 ${_armhf_dir}/libSDL2-2.0.so.0"
     _armhf_files="${_armhf_files} ${_armhf_dir}/librga.so ${_armhf_dir}/libgo2.so"
+    [ "$KERNEL_SERIES" == "5.10" ] && [ "$CHIPSET" == "rk3326" ] &&
+      _armhf_files="${_armhf_files} ${_armhf_dir}/libvulkan.so.1 ${_armhf_dir}/libMaliVulkan.so.1"
   fi
   _armhf_missing="$(sudo chroot Arkbuild/ bash -c "
     dpkg --print-foreign-architectures | grep -qx armhf || echo 'armhf foreign architecture'

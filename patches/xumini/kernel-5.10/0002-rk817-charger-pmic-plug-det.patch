@@ -1,0 +1,57 @@
+diff --git a/drivers/power/supply/rk817_charger.c b/drivers/power/supply/rk817_charger.c
+index 8c8d7d4..fd48ebf 100644
+--- a/drivers/power/supply/rk817_charger.c
++++ b/drivers/power/supply/rk817_charger.c
+@@ -285,6 +285,7 @@ struct charger_platform_data {
+ 	int otg5v_suspend_enable;
+ 	bool extcon;
+ 	int gate_function_disable;
++	bool pmic_plug_det;
+ };
+ 
+ struct rk817_charger {
+@@ -1417,6 +1418,8 @@ static int rk817_charge_parse_dt(struct rk817_charger *charge)
+ 	pdata->chrg_term_mode = DEFAULT_CHRG_TERM_MODE;
+ 
+ 	pdata->extcon = of_property_read_bool(np, "extcon");
++	/* For boards whose charger reaches neither dc_det_gpio nor BC detection */
++	pdata->pmic_plug_det = of_property_read_bool(np, "pmic_plug_det");
+ 
+ 	ret = of_property_read_u32(np, "max_chrg_current",
+ 				   &pdata->max_chrg_current);
+@@ -1545,7 +1548,9 @@ static void rk817_charge_irq_delay_work(struct work_struct *work)
+ 	if (charge->plugin_trigger) {
+ 		DBG("pmic: plug in\n");
+ 		charge->plugin_trigger = 0;
+-		if (charge->pdata->extcon)
++		if (charge->pdata->pmic_plug_det)
++			rk817_charge_set_chrg_param(charge, USB_TYPE_AC_CHARGER);
++		else if (charge->pdata->extcon)
+ 			queue_delayed_work(charge->usb_charger_wq, &charge->usb_work,
+ 					   msecs_to_jiffies(10));
+ 	} else if (charge->plugout_trigger) {
+@@ -1713,6 +1718,11 @@ static int rk817_charge_probe(struct platform_device *pdev)
+ 		schedule_delayed_work(&charge->usb_work, 0);
+ 	}
+ 
++	/* A charger plugged in before boot raised no plug-in irq */
++	if (charge->pdata->pmic_plug_det &&
++	    rk817_charge_get_plug_in_status(charge))
++		rk817_charge_set_chrg_param(charge, USB_TYPE_AC_CHARGER);
++
+ 	rk817_chage_debug(charge);
+ 	DBG("driver version: %s\n", CHARGE_DRIVER_VERSION);
+ 
+@@ -1786,6 +1796,12 @@ static int rk817_charge_pm_resume(struct device *dev)
+ 	if (charge->otg_slp_state)
+ 		rk817_charge_otg_slp_enable(charge);
+ 
++	/* Catch a plug or unplug that happened while suspended */
++	if (charge->pdata->pmic_plug_det)
++		rk817_charge_set_chrg_param(charge,
++					    rk817_charge_get_plug_in_status(charge) ?
++					    USB_TYPE_AC_CHARGER : USB_TYPE_NONE_CHARGER);
++
+ 	return 0;
+ }
+ #endif

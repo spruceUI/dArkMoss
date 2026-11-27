@@ -125,7 +125,8 @@ do
     FOLDER="armhf"
   fi
   sudo mkdir -p Arkbuild/usr/lib/${ARCHITECTURE}/
-  wget --retry-connrefused --retry-on-http-error=429 --waitretry=20 -t 65 -T 60 --no-check-certificate -O ${whichmali} https://github.com/christianhaitian/${CHIPSET}_core_builds/raw/refs/heads/master/mali/${FOLDER}/${whichmali}
+  fetch_mali ${FOLDER} ${whichmali}
+  verify_action
   sudo mv ${whichmali} Arkbuild/usr/lib/${ARCHITECTURE}/.
   cd Arkbuild/usr/lib/${ARCHITECTURE}
   sudo ln -sf ${whichmali} libMali.so
@@ -134,9 +135,22 @@ do
     sudo rm -fv ${LIB}
     sudo ln -sfv libMali.so ${LIB}
   done
+  [ "$KERNEL_SERIES" == "5.10" ] && sudo ln -sfv ${whichmali} libMaliVulkan.so.1
   cd ../../../../
 done
 sudo chroot Arkbuild/ ldconfig -X
+
+# 5.10: g29p1 is also the Vulkan driver.
+if [ "$KERNEL_SERIES" == "5.10" ]; then
+  sudo mkdir -p Arkbuild/usr/share/vulkan/icd.d
+  printf '%s\n' '{' '  "file_format_version" : "1.0.0",' '  "ICD" : {' \
+    '    "library_path" : "libMaliVulkan.so.1",' '    "api_version" : "1.3.276"' '  }' '}' |
+    sudo tee Arkbuild/usr/share/vulkan/icd.d/mali.json >/dev/null
+  VULKAN_PACKAGES="libvulkan1 vulkan-tools"
+  [[ "${BUILD_ARMHF}" == "y" ]] && VULKAN_PACKAGES="${VULKAN_PACKAGES} libvulkan1:armhf"
+  sudo chroot Arkbuild/ bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -y ${VULKAN_PACKAGES}"
+  verify_action
+fi
 
 # Install meson
 sudo chroot ${CHROOT_DIR}/ bash -c "git clone https://github.com/mesonbuild/meson.git && ln -s /meson/meson.py /usr/bin/meson"

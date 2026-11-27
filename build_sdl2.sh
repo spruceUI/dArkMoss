@@ -37,6 +37,7 @@ if [ "$ARCH" == "arm-linux-gnueabihf" ]; then
     export CFLAGS=\"-Wno-error=int-conversion\" &&
     if [ ! -d ${CHIPSET}_core_builds ]; then git clone https://github.com/christianhaitian/${CHIPSET}_core_builds.git; fi &&
     cd ${CHIPSET}_core_builds &&
+    if [[ ${KERNEL_SERIES} == \"5.10\" ]]; then sed -i -e 's/-DSDL_VULKAN=OFF/-DSDL_VULKAN=ON/' -e 's/--disable-video-vulkan/--enable-video-vulkan/' scripts/sdl2.sh scripts/sdl3.sh; fi &&
     if [[ ${UNIT} == *\"miniloong\"* ]]; then cp patches/${UNIT}/sdl2/*.patch patches/.; fi &&
     if [[ ${UNIT} == \"e5plus\" ]]; then sed 's/HAL_TRANSFORM_ROT_270/HAL_TRANSFORM_ROT_90/' patches/miniloong/sdl2/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch > patches/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch && grep -q HAL_TRANSFORM_ROT_90 patches/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch; fi &&
     if [[ ${UNIT} == \"xumini\" ]]; then cp -f /home/ark/xumini_sdl2_patch/*.patch patches/.; fi &&
@@ -49,6 +50,7 @@ else
   sudo chroot ${CHROOT_DIR}/ bash -c "source /root/.bashrc && cd /home/ark &&
     if [ ! -d ${CHIPSET}_core_builds ]; then git clone https://github.com/christianhaitian/${CHIPSET}_core_builds.git; fi &&
     cd ${CHIPSET}_core_builds &&
+    if [[ ${KERNEL_SERIES} == \"5.10\" ]]; then sed -i -e 's/-DSDL_VULKAN=OFF/-DSDL_VULKAN=ON/' -e 's/--disable-video-vulkan/--enable-video-vulkan/' scripts/sdl2.sh scripts/sdl3.sh; fi &&
     if [[ ${UNIT} == *\"miniloong\"* ]]; then cp patches/${UNIT}/sdl2/*.patch patches/.; fi &&
     if [[ ${UNIT} == \"e5plus\" ]]; then sed 's/HAL_TRANSFORM_ROT_270/HAL_TRANSFORM_ROT_90/' patches/miniloong/sdl2/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch > patches/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch && grep -q HAL_TRANSFORM_ROT_90 patches/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch; fi &&
     if [[ ${UNIT} == \"xumini\" ]]; then cp -f /home/ark/xumini_sdl2_patch/*.patch patches/.; fi &&

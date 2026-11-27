@@ -1,0 +1,17 @@
+diff --git a/drivers/power/supply/rk817_battery.c b/drivers/power/supply/rk817_battery.c
+index 86ed9db..86a833f 100644
+--- a/drivers/power/supply/rk817_battery.c
++++ b/drivers/power/supply/rk817_battery.c
+@@ -1660,6 +1660,12 @@ static void rk817_bat_init_fg(struct rk817_battery_device *battery)
+ 	rk817_bat_rsoc_init(battery);
+ 	rk817_bat_init_coulomb_cap(battery, battery->nac);
+ 	DBG("rsoc%d, fcc = %d\n", battery->rsoc, battery->fcc);
++	/* A saved dsoc left by another OS survives U-Boot's init; start from the counted charge */
++	if (abs(battery->dsoc - battery->rsoc) > 10 * 1000) {
++		BAT_INFO("dsoc %d far from rsoc %d, resync\n", battery->dsoc, battery->rsoc);
++		battery->dsoc = battery->rsoc;
++		rk817_bat_save_dsoc(battery, battery->dsoc);
++	}
+ 	rk817_bat_init_dsoc_algorithm(battery);
+ 	battery->qmax = rk817_bat_get_qmax(battery);
+ 	battery->voltage_avg = rk817_bat_get_battery_voltage(battery);

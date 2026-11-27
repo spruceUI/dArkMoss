@@ -1,0 +1,40 @@
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-a10mini-linux.dts b/arch/arm64/boot/dts/rockchip/rk3326-a10mini-linux.dts
+index a6330f8..6b2a1ec 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-a10mini-linux.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-a10mini-linux.dts
+@@ -714,8 +714,6 @@
+ 			clock-names = "mclk";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&i2s1_2ch_mclk>;
+-			spk-mute-delay-ms = <50>;
+-			use-ext-amplifier;
+ 			hp-volume = <20>;
+ 			spk-volume = <3>;
+ 			volume-min-db = <72>;  /* -90*0.5 = -45 */
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-a10mini-v4-linux.dts b/arch/arm64/boot/dts/rockchip/rk3326-a10mini-v4-linux.dts
+index 197b138..b46c631 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-a10mini-v4-linux.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3326-a10mini-v4-linux.dts
+@@ -277,3 +277,22 @@
+ 		};
+ 	};
+ };
++
++/* V4: speaker is on an external amplifier, as the vendor dtb sets */
++&rk817_codec {
++	spk-mute-delay-ms = <50>;
++	use-ext-amplifier;
++};
++
++/* V4: PVTM sits on the bin-0/1 edge; bin 1 undervolts and oopses. Pin bin 0. */
++&cpu0_opp_table {
++	/delete-property/ rockchip,pvtm-voltage-sel;
++};
++
++&gpu_opp_table {
++	/delete-property/ rockchip,pvtm-voltage-sel;
++};
++
++&dmc_opp_table {
++	/delete-property/ rockchip,pvtm-voltage-sel;
++};

@@ -1,0 +1,189 @@
+diff --git a/drivers/input/joystick/odroidgo3-joypad.c b/drivers/input/joystick/odroidgo3-joypad.c
+index 1c7463d..37af2bd 100644
+--- a/drivers/input/joystick/odroidgo3-joypad.c
++++ b/drivers/input/joystick/odroidgo3-joypad.c
+@@ -135,6 +135,8 @@ struct joypad {
+ 
+ 	bool enable;			/* 上报使能/禁用 */
+ 
++	bool dpad_analog;		/* d-pad reported as the left stick */
++
+ 	struct analog_mux *amux;	/* 模拟多路复用器控制 */
+ 	int amux_count;			/* 模拟多路复用器通道数 */
+ 	struct bt_adc *adcs;		/* ADC 摇杆轴数组 */
+@@ -711,6 +713,72 @@ static DEVICE_ATTR(enable, S_IWUSR | S_IRUGO,
+ 		   joypad_show_enable,
+ 		   joypad_store_enable);
+ 
++/*----------------------------------------------------------------------------*/
++static bool joypad_is_dpad(struct bt_gpio *gpio)
++{
++	return gpio->report_type == EV_KEY &&
++		gpio->linux_code >= BTN_DPAD_UP &&
++		gpio->linux_code <= BTN_DPAD_RIGHT;
++}
++
++/*
++ * ATTRIBUTES:
++ *
++ * /sys/devices/platform/odroidgo3-joypad/dpad_analog [rw]
++ *
++ * 1: the d-pad drives ABS_X/ABS_Y at full deflection and its keys go quiet,
++ * for stickless units. 0: normal.
++ */
++static ssize_t joypad_store_dpad_analog(struct device *dev,
++				      struct device_attribute *attr,
++				      const char *buf,
++				      size_t count)
++{
++	struct platform_device *pdev  = to_platform_device(dev);
++	struct joypad *joypad = platform_get_drvdata(pdev);
++	bool on;
++	int nbtn, error;
++
++	error = kstrtobool(buf, &on);
++	if (error)
++		return error;
++
++	mutex_lock(&joypad->lock);
++	if (on != joypad->dpad_analog) {
++		for (nbtn = 0; nbtn < joypad->bt_gpio_count; nbtn++) {
++			struct bt_gpio *gpio = &joypad->gpios[nbtn];
++			bool released = gpio->is_adc ? false : !gpio->active_level;
++
++			if (!joypad_is_dpad(gpio))
++				continue;
++			/* release held keys; when off, held keys report again */
++			if (on && gpio->old_value != released)
++				input_event(joypad->input, EV_KEY,
++					gpio->linux_code, 0);
++			gpio->old_value = released;
++		}
++		input_sync(joypad->input);
++		joypad->dpad_analog = on;
++	}
++	mutex_unlock(&joypad->lock);
++
++	return count;
++}
++
++static ssize_t joypad_show_dpad_analog(struct device *dev,
++				     struct device_attribute *attr,
++				     char *buf)
++{
++	struct platform_device *pdev  = to_platform_device(dev);
++	struct joypad *joypad = platform_get_drvdata(pdev);
++
++	return sprintf(buf, "%d\n", joypad->dpad_analog);
++}
++
++static DEVICE_ATTR(dpad_analog, S_IWUSR | S_IRUGO,
++		   joypad_show_dpad_analog,
++		   joypad_store_dpad_analog);
++
+ /*----------------------------------------------------------------------------*/
+ /*
+  * 属性:
+@@ -1327,6 +1395,7 @@ static struct attribute *joypad_attrs[] = {
+ 	&dev_attr_swap_ab.attr,
+ 	&dev_attr_swap_xy.attr,
+ 	&dev_attr_enable.attr,
++	&dev_attr_dpad_analog.attr,
+ 	&dev_attr_adc_cal.attr,
+ 	&dev_attr_amux_debug.attr,
+ 	&dev_attr_rumble_period.attr,
+@@ -1469,6 +1538,8 @@ static void joypad_gpio_check(struct input_polled_dev *poll_dev)
+ 	for (nbtn = 0; nbtn < joypad->bt_gpio_count; nbtn++) {
+ 		struct bt_gpio *gpio = &joypad->gpios[nbtn];
+ 
++		if (joypad->dpad_analog && joypad_is_dpad(gpio))
++			continue;
+ 		if (gpio->is_adc)
+ 			joypad_adc_key_check(joypad, poll_dev, gpio);
+ 		else
+@@ -1636,6 +1707,8 @@ static void joypad_adc_check(struct input_polled_dev *poll_dev)
+ 
+ 	/* 直接ADC模式: 固定2轴 (ABS_X/ABS_Y) */
+ 	if (joypad->direct_adc_mode) {
++		if (joypad->dpad_analog)
++			return;
+ 		joypad_adc_report_pair(joypad, poll_dev,
+ 				       &joypad->adcs[0], &joypad->adcs[1], 0);
+ 		return;
+@@ -1647,7 +1720,7 @@ static void joypad_adc_check(struct input_polled_dev *poll_dev)
+ 	 */
+ 	for (nbtn = 0; nbtn + 1 < joypad->amux_count; nbtn += 2) {
+ 		if ((nbtn == 0 && joypad->skip_absr) ||
+-		    (nbtn == 2 && joypad->skip_absl))
++		    (nbtn == 2 && (joypad->skip_absl || joypad->dpad_analog)))
+ 			continue;
+ 
+ 		joypad_adc_report_pair(joypad, poll_dev,
+@@ -1683,6 +1756,41 @@ static void joypad_stick_switch_update(struct joypad *joypad,
+ 	joypad->stick_switch_active = test_bit(code, input->key);
+ }
+ 
++/*----------------------------------------------------------------------------*/
++static bool joypad_dpad_pressed(struct joypad *joypad, int code)
++{
++	int nbtn;
++
++	for (nbtn = 0; nbtn < joypad->bt_gpio_count; nbtn++) {
++		struct bt_gpio *gpio = &joypad->gpios[nbtn];
++
++		if (!gpio->is_adc && gpio->report_type == EV_KEY &&
++		    gpio->linux_code == code)
++			return gpio_get_value(gpio->num) == gpio->active_level;
++	}
++	return false;
++}
++
++static void joypad_dpad_report(struct joypad *joypad, struct input_dev *input)
++{
++	static const int axes[][3] = {
++		{ ABS_X, BTN_DPAD_LEFT, BTN_DPAD_RIGHT },
++		{ ABS_Y, BTN_DPAD_UP, BTN_DPAD_DOWN },
++	};
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(axes); i++) {
++		bool neg = joypad_dpad_pressed(joypad, axes[i][1]);
++		bool pos = joypad_dpad_pressed(joypad, axes[i][2]);
++		int value = 0;
++
++		if (neg != pos)
++			value = neg ? input_abs_get_min(input, axes[i][0]) :
++				      input_abs_get_max(input, axes[i][0]);
++		input_report_abs(input, axes[i][0], value);
++	}
++}
++
+ /*----------------------------------------------------------------------------*/
+ /**
+  * joypad_poll() - 主轮询函数, 按固定间隔调用.
+@@ -1710,6 +1818,9 @@ static void joypad_poll(struct input_polled_dev *poll_dev)
+ 		if (joypad->amux_count)
+ 			joypad_adc_check(poll_dev);
+ 
++		if (joypad->dpad_analog)
++			joypad_dpad_report(joypad, poll_dev->input);
++
+ 		/* 3. 报告所有按钮状态 */
+ 		joypad_gpio_check(poll_dev);
+ 
+@@ -2453,6 +2564,15 @@ static int joypad_input_setup(struct device *dev, struct joypad *joypad)
+ 		}
+ 	}
+ 
++	/* dpad_analog needs a left stick: stickless units get one that rests at 0 */
++	if (!test_bit(ABS_X, input->absbit)) {
++		__set_bit(EV_ABS, input->evbit);
++		input_set_abs_params(input, ABS_X, -(ADC_MAX_VOLTAGE / 2),
++				     ADC_MAX_VOLTAGE / 2, 0, 0);
++		input_set_abs_params(input, ABS_Y, -(ADC_MAX_VOLTAGE / 2),
++				     ADC_MAX_VOLTAGE / 2, 0, 0);
++	}
++
+ 	/*
+ 	 * 如果配置了摇杆切换键，注册右摇杆能力
+ 	 * R3 (BTN_THUMBR) 由 DTS 中的 GPIO 按钮节点注册

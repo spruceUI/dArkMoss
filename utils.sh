@@ -34,11 +34,39 @@ if [ -d "$OPT_TOOLCHAIN_DIR" ]; then
 else
     export PATH="$LOCAL_TOOLCHAIN_DIR"/bin/:$PATH
 fi
-if [ "$CHIPSET" == "rk3326" ]; then
+# rk3326 units run the Rockchip 5.10 kernel (jokubasver/rockchip-kernel, from arkos4clone)
+# with the g29p1 Mali driver, which also provides Vulkan. rgb10/rk2020 are upstream units
+# dArkMoss does not build; they stay on 4.4 and rxp0.
+if [ "$CHIPSET" == "rk3326" ] && [ "$UNIT" != "rgb10" ] && [ "$UNIT" != "rk2020" ]; then
+  export KERNEL_SERIES=5.10
+else
+  export KERNEL_SERIES=4.4
+fi
+if [ "$CHIPSET" == "rk3326" ] && [ "$KERNEL_SERIES" == "5.10" ]; then
+  export whichmali=libmali-bifrost-g31-g29p1.so
+elif [ "$CHIPSET" == "rk3326" ]; then
   export whichmali=libmali-bifrost-g31-rxp0-gbm.so
 else
   export whichmali=libmali-bifrost-g52-g29p1.so
 fi
+
+# fetch_mali <aarch64|armhf> <dest>: the g29p1 for the 5.10 kernel is arkos4clone's
+# (jokubasver's build-ID fix), pinned by commit and checksum.
+MALI_510_COMMIT=641dc2823f18806923f58b8963be2e7978246bd9
+MALI_510_SHA256_aarch64=fe5c6b86316a1280cd7c223bfa645c0996fcc11884da117cc8a6dddcd555e48f
+MALI_510_SHA256_armhf=60b53dec315bfc316d504554118fb6dd8bdd516deb1336261f67c001d8ab6e15
+function fetch_mali() {
+  if [ "$CHIPSET" == "rk3326" ] && [ "$KERNEL_SERIES" == "5.10" ]; then
+    local triplet=aarch64-linux-gnu sum=$MALI_510_SHA256_aarch64
+    [ "$1" == "armhf" ] && triplet=arm-linux-gnueabihf sum=$MALI_510_SHA256_armhf
+    wget --retry-connrefused --retry-on-http-error=429 --waitretry=20 -t 65 -T 60 -O "$2" \
+      https://raw.githubusercontent.com/lcdyk0517/arkos4clone/${MALI_510_COMMIT}/rootfs/dArkOS/usr/lib/${triplet}/mali/${whichmali} &&
+      echo "${sum}  $2" | sha256sum -c -
+  else
+    wget --retry-connrefused --retry-on-http-error=429 --waitretry=20 -t 65 -T 60 --no-check-certificate -O "$2" \
+      https://github.com/christianhaitian/${CHIPSET}_core_builds/raw/refs/heads/master/mali/$1/${whichmali}
+  fi
+}
 
 function verify_action() {
   code=$?
@@ -125,7 +153,8 @@ function setup_arkbuild32() {
     sudo cp -a Arkbuild32/home/ark/libgo2/libgo2.so* Arkbuild/usr/lib/arm-linux-gnueabihf/
     # Place libmali manually (assumes you have libmali.so or mali drivers ready)
     sudo mkdir -p Arkbuild32/usr/lib/arm-linux-gnueabihf/
-    wget -t 3 -T 60 --no-check-certificate https://github.com/christianhaitian/${CHIPSET}_core_builds/raw/refs/heads/master/mali/armhf/${whichmali}
+    fetch_mali armhf ${whichmali}
+    verify_action
     sudo mv ${whichmali} Arkbuild32/usr/lib/arm-linux-gnueabihf/.
     cd Arkbuild32/usr/lib/arm-linux-gnueabihf
     sudo ln -sf ${whichmali} libMali.so
