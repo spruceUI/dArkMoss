@@ -197,6 +197,20 @@ do
 done
 cd ../../../../
 
+# 5.10: Mali is the only Vulkan driver. apt brings Mesa's (lavapipe and friends) along with
+# libvulkan1; divert their manifests so the loader, which reads only *.json, never offers them.
+if [ "$KERNEL_SERIES" == "5.10" ] && [ "$CHIPSET" == "rk3326" ]; then
+  call_chroot '
+    for icd in /usr/share/vulkan/icd.d/*.json; do
+      [ "${icd##*/}" = mali.json ] && continue
+      dpkg -S "$icd" >/dev/null 2>&1 && dpkg-divert --divert "$icd.distrib" --rename --add "$icd" >/dev/null
+    done
+    ls /usr/share/vulkan/icd.d/
+  '
+  test "$(ls Arkbuild/usr/share/vulkan/icd.d/*.json)" == "Arkbuild/usr/share/vulkan/icd.d/mali.json"
+  verify_action
+fi
+
 # Make sure the built librga shared libs are still available in aarch64
 sudo cp -av Arkbuild/usr/lib/librga.so* Arkbuild/usr/lib/aarch64-linux-gnu/
 
