@@ -1,0 +1,11 @@
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -1649,7 +1649,7 @@
+ 	  .type = DRM_PLANE_TYPE_PRIMARY,
+ 	  .feature = WIN_FEATURE_AFBDC },
+ 	{ .base = 0xe0, .phy = &px30_win23_data,
+-	  .type = DRM_PLANE_TYPE_CURSOR,
++	  .type = DRM_PLANE_TYPE_OVERLAY,
+ 	  .area = rk3368_area_data,
+ 	  .area_size = ARRAY_SIZE(rk3368_area_data), },
+ };
