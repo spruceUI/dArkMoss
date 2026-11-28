@@ -1,0 +1,17 @@
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-linux.dtsi b/arch/arm64/boot/dts/rockchip/rk3326-linux.dtsi
+index a93fbdf..c5f4ff5 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-linux.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3326-linux.dtsi
+@@ -167,3 +167,12 @@
+ &video_phy {
+ 	status = "okay";
+ };
++
++/*
++ * The bl31 these units boot has no SCMI: on a cold boot the probe fails (-95). After a warm
++ * reset the shared-memory channel still reads busy from the previous kernel, and the probe
++ * spins on it forever (soft lockup in shmem_tx_prepare), hanging every reboot.
++ */
++&scmi {
++	status = "disabled";
++};
