@@ -1,0 +1,15 @@
+diff --git a/arch/arm64/boot/dts/rockchip/rk3326-vdd-logic-1150.dtsi b/arch/arm64/boot/dts/rockchip/rk3326-vdd-logic-1150.dtsi
+index 0b66408..43ea03c 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3326-vdd-logic-1150.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3326-vdd-logic-1150.dtsi
+@@ -102,3 +102,10 @@
+ 		opp-microvolt-L3 = <1150000>;
+ 	};
+ };
++
++/* After the voltages above, as the 4.4 dts did: DDR never runs below 666 MHz, reboots included */
++&dmc_opp_table {
++	/delete-node/ opp-194000000;
++	/delete-node/ opp-328000000;
++	/delete-node/ opp-450000000;
++};
