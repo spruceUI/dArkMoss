@@ -51,10 +51,14 @@ else
   INITRD_LOAD_LINE='load mmc 1:1 ${initrd_loadaddr} uInitrd'
   BOOTI_LINE='booti ${loadaddr} ${initrd_loadaddr} ${dtb_loadaddr}'
 fi
+# 5.10: the clocks the 4.4 dts allowed. rk3326-oc.dtsi adds faster OPPs (DDR to 1032 MHz,
+# GPU to 600) that arkos4clone caps from the command line, with these values for every unit.
+FREQ_ARGS=""
+[ "$KERNEL_SERIES" == "5.10" ] && FREQ_ARGS=" max_cpufreq=1296 boot_cpufreq=1248 max_gpufreq=520 max_ddrfreq=666"
 cat <<EOF | sudo tee ${mountpoint}/boot.ini
 odroidgoa-uboot-config
 
-${PANEL_LINE}setenv bootargs "root=/dev/mmcblk0p2 rootwait rw fsck.repair=yes net.ifnames=0 fbcon=rotate:${BOOT_ROTATION} console=/dev/ttyFIQ0 quiet splash consoleblank=0 vt.global_cursor_default=0${PANEL_ARGS}${ROOTFS_ARGS}"
+${PANEL_LINE}setenv bootargs "root=/dev/mmcblk0p2 rootwait rw fsck.repair=yes net.ifnames=0 fbcon=rotate:${BOOT_ROTATION} console=/dev/ttyFIQ0 quiet splash consoleblank=0 vt.global_cursor_default=0${PANEL_ARGS}${ROOTFS_ARGS}${FREQ_ARGS}"
 ${DEBUG_LINE}
 
 # Booting
