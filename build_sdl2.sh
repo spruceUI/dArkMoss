@@ -41,6 +41,7 @@ if [ "$ARCH" == "arm-linux-gnueabihf" ]; then
     if [[ ${UNIT} == *\"miniloong\"* ]]; then cp patches/${UNIT}/sdl2/*.patch patches/.; fi &&
     if [[ ${UNIT} == \"e5plus\" ]]; then sed 's/HAL_TRANSFORM_ROT_270/HAL_TRANSFORM_ROT_90/' patches/miniloong/sdl2/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch > patches/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch && grep -q HAL_TRANSFORM_ROT_90 patches/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch; fi &&
     if [[ ${UNIT} == \"xumini\" ]]; then cp -f /home/ark/xumini_sdl2_patch/*.patch patches/.; fi &&
+    if [[ ${KERNEL_SERIES} == \"5.10\" ]]; then sed -i -e 's/^+\( *\)KMSDRM_InitRotateBuffer(_this/+\1if (!is_vulkan) KMSDRM_InitRotateBuffer(_this/' -e 's/^+\( *\)c_RkRgaDeInit();/+\1if (!is_vulkan) c_RkRgaDeInit();/' -e 's/^+\( *\)for (int i = 0; i < RGA_BUFFERS_MAX; ++i) {\$/+\1if (!is_vulkan) for (int i = 0; i < RGA_BUFFERS_MAX; ++i) {/' patches/sdl2-patch-0004-*.patch && grep -q 'if (!is_vulkan) KMSDRM_InitRotateBuffer' patches/sdl2-patch-0004-*.patch; fi &&
     chmod 777 builds-alt.sh &&
     eatmydata ./builds-alt.sh sdl2 &&
     cd SDL/${sub_folder} &&
@@ -54,6 +55,7 @@ else
     if [[ ${UNIT} == *\"miniloong\"* ]]; then cp patches/${UNIT}/sdl2/*.patch patches/.; fi &&
     if [[ ${UNIT} == \"e5plus\" ]]; then sed 's/HAL_TRANSFORM_ROT_270/HAL_TRANSFORM_ROT_90/' patches/miniloong/sdl2/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch > patches/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch && grep -q HAL_TRANSFORM_ROT_90 patches/sdl2-patch-0004-miniloong-rotate-kmsdrm.patch; fi &&
     if [[ ${UNIT} == \"xumini\" ]]; then cp -f /home/ark/xumini_sdl2_patch/*.patch patches/.; fi &&
+    if [[ ${KERNEL_SERIES} == \"5.10\" ]]; then sed -i -e 's/^+\( *\)KMSDRM_InitRotateBuffer(_this/+\1if (!is_vulkan) KMSDRM_InitRotateBuffer(_this/' -e 's/^+\( *\)c_RkRgaDeInit();/+\1if (!is_vulkan) c_RkRgaDeInit();/' -e 's/^+\( *\)for (int i = 0; i < RGA_BUFFERS_MAX; ++i) {\$/+\1if (!is_vulkan) for (int i = 0; i < RGA_BUFFERS_MAX; ++i) {/' patches/sdl2-patch-0004-*.patch && grep -q 'if (!is_vulkan) KMSDRM_InitRotateBuffer' patches/sdl2-patch-0004-*.patch; fi &&
     chmod 777 builds-alt.sh &&
     eatmydata ./builds-alt.sh sdl2 &&
     cd SDL/build &&
