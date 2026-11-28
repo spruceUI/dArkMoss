@@ -1,0 +1,15 @@
+[Unit]
+Description=Apply persistent stick-RGB LED state
+DefaultDependencies=no
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+Before=basic.target
+ConditionPathExists=/home/ark/.config/led.cfg
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ledctl apply
+RemainAfterExit=no
+
+[Install]
+WantedBy=basic.target

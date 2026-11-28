@@ -65,6 +65,12 @@ for i in "${!PARTS[@]}"; do
 done
 
 # Refresh partitions
+# The RK3562 U-Boot's distro_bootcmd boots only a partition marked legacy
+# BIOS bootable.
+if [ "$CHIPSET" == "rk3562" ]; then
+  sudo sgdisk --attributes=3:set:2 $LOOP_DEV
+fi
+
 sudo partprobe $LOOP_DEV
 sleep 2
 

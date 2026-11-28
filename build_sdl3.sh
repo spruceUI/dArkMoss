@@ -23,11 +23,11 @@ elif bc_available; then
 fi
 
 # Build and install SDL3
-if [ -f "Arkbuild_package_cache/${CHIPSET}/sdl3.tar.gz" ] && [ "$(cat Arkbuild_package_cache/${CHIPSET}/sdl3.commit)" == "$(curl -s https://raw.githubusercontent.com/christianhaitian/${CHIPSET}_core_builds/refs/heads/master/scripts/sdl3.sh | grep -oP '(?<=extension=").*?(?=")')" ]; then
+if [ -f "Arkbuild_package_cache/${CHIPSET}/sdl3.tar.gz" ] && [ "$(cat Arkbuild_package_cache/${CHIPSET}/sdl3.commit)" == "$(curl -s https://raw.githubusercontent.com/christianhaitian/${CORE_BUILDS_CHIPSET}_core_builds/refs/heads/master/scripts/sdl3.sh | grep -oP '(?<=extension=").*?(?=")')" ]; then
     sudo tar -xvzpf Arkbuild_package_cache/${CHIPSET}/sdl3.tar.gz
 else
 	sudo chroot ${CHROOT_DIR}/ bash -c "source /root/.bashrc && cd /home/ark &&
-	  if [ ! -d ${CHIPSET}_core_builds ]; then git clone https://github.com/christianhaitian/${CHIPSET}_core_builds.git; fi &&
+	  if [ ! -d ${CHIPSET}_core_builds ]; then git clone https://github.com/christianhaitian/${CORE_BUILDS_CHIPSET}_core_builds.git ${CHIPSET}_core_builds; fi &&
 	  cd ${CHIPSET}_core_builds &&
 	  chmod 777 builds-alt.sh &&
 	  eatmydata ./builds-alt.sh sdl3 &&
@@ -47,7 +47,7 @@ else
 	  sudo rm -f Arkbuild_package_cache/${CHIPSET}/sdl3.commit
 	fi
 	sudo tar -czpf Arkbuild_package_cache/${CHIPSET}/sdl3.tar.gz Arkbuild/usr/lib/${ARCH}/libSDL3.so.${sdl3_extension} Arkbuild/usr/lib/${ARCH}/libSDL3_mixer.so.0.${SDL3_MIXER_EXTENSION}
-	sudo curl -s https://raw.githubusercontent.com/christianhaitian/${CHIPSET}_core_builds/refs/heads/master/scripts/sdl3.sh | grep -oP '(?<=extension=").*?(?=")' > Arkbuild_package_cache/${CHIPSET}/sdl3.commit
+	sudo curl -s https://raw.githubusercontent.com/christianhaitian/${CORE_BUILDS_CHIPSET}_core_builds/refs/heads/master/scripts/sdl3.sh | grep -oP '(?<=extension=").*?(?=")' > Arkbuild_package_cache/${CHIPSET}/sdl3.commit
 fi
 if [ "${SDL3_FROM_CACHE}" != "y" ] && [ -f Arkbuild/usr/lib/${ARCH}/libSDL3.so.${sdl3_extension} ] \
     && [ -f Arkbuild/usr/lib/${ARCH}/libSDL3_mixer.so.0.${SDL3_MIXER_EXTENSION} ]; then

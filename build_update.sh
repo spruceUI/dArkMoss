@@ -28,6 +28,7 @@ case "$UNIT" in
   rg351p)    DMUPD_PLATFORM="RG351P" ;;
   xumini)    DMUPD_PLATFORM="XUMiniM" ;;
   e5plus)    DMUPD_PLATFORM="E5Plus" ;;
+  rg52mini)  DMUPD_PLATFORM="RG52Mini" ;;
   *)         DMUPD_PLATFORM="" ;;
 esac
 

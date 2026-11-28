@@ -14,3 +14,6 @@ rg351/
 *.img
 .img.*
 wget-log*
+rk3562_port/
+kernel_rk3562/
+initrd/

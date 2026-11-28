@@ -1,0 +1,59 @@
+#!/bin/bash
+
+case $1 in
+   pre)
+    echo $(cat /sys/class/backlight/backlight/brightness) | sudo tee /var/local/cur_bright.state
+    echo 0 | sudo tee /sys/class/backlight/backlight/brightness
+    # The RK817 codec only restores audio on wake with Resume Path on.
+    amixer -q sset 'Resume Path' ON 2>/dev/null
+    /usr/sbin/alsactl store -f /var/local/asound.state
+    if [ -f "/usr/local/bin/quickmode.sh" ]; then
+      touch /dev/shm/.JUSTWOKEUP
+    fi
+    sudo btconnected.sh check
+    sudo sleep_governors.sh SaveSettingsOnSleep
+    # Power LEDs off for the sleep: GPIO3_A0 green (96), GPIO3_A1 red (97).
+    for gpio in 96 97; do
+      if [ ! -d /sys/class/gpio/gpio${gpio} ]; then
+        echo ${gpio} > /sys/class/gpio/export 2>/dev/null
+        echo out > /sys/class/gpio/gpio${gpio}/direction 2>/dev/null
+      fi
+    done
+    cat /sys/class/gpio/gpio96/value > /var/local/led_green.state 2>/dev/null
+    cat /sys/class/gpio/gpio97/value > /var/local/led_red.state 2>/dev/null
+    echo 0 > /sys/class/gpio/gpio96/value 2>/dev/null
+    echo 0 > /sys/class/gpio/gpio97/value 2>/dev/null
+    [ -f /home/ark/.config/led.cfg ] && /usr/local/bin/ledctl suspend 2>/dev/null
+    ;;
+   post)
+    echo out > /sys/class/gpio/gpio96/direction 2>/dev/null
+    echo out > /sys/class/gpio/gpio97/direction 2>/dev/null
+    if [ -f /var/local/led_green.state ]; then
+      cat /var/local/led_green.state > /sys/class/gpio/gpio96/value 2>/dev/null
+    else
+      echo 1 > /sys/class/gpio/gpio96/value 2>/dev/null
+    fi
+    if [ -f /var/local/led_red.state ]; then
+      cat /var/local/led_red.state > /sys/class/gpio/gpio97/value 2>/dev/null
+    else
+      echo 0 > /sys/class/gpio/gpio97/value 2>/dev/null
+    fi
+    [ -f /home/ark/.config/led.cfg ] && /usr/local/bin/ledctl apply 2>/dev/null
+    echo $(cat /var/local/cur_bright.state) | sudo tee /sys/class/backlight/backlight/brightness
+    sudo sleep_governors.sh RestoreSettingsOnWake
+    sudo /usr/sbin/alsactl restore -f /var/local/asound.state
+    if systemctl is-active --quiet bluetooth.service; then
+      sleep 2
+    fi
+    systemctl is-active --quiet bluetooth.service && sudo systemctl restart bluetooth
+    systemctl is-active --quiet bluealsa.service && sudo systemctl restart bluealsa
+    systemctl is-active --quiet watchforbtaudio.service && sudo systemctl restart watchforbtaudio --no-block
+    if [ -f "/var/local/btautoreconnect.state" ]; then
+      sleep 12
+      sudo btconnected.sh reconnect
+      sudo rm -f /var/local/btautoreconnect.state
+    fi
+    systemctl is-active --quiet killer_daemon && sudo systemctl restart killer_daemon
+    exit 0
+    ;;
+esac

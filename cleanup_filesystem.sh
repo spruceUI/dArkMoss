@@ -256,7 +256,7 @@ sudo rm -rf Arkbuild/var/lib/apt/lists/*
 sudo rm -f Arkbuild/var/log/*.log
 sudo rm -f Arkbuild/var/log/apt/*.log
 sudo rm -f Arkbuild/tmp/reboot-needed
-if [[ "${CHIPSET}" == "rk3566" ]]; then
+if [[ "${CHIPSET}" == "rk3566" ]] || [[ "${CHIPSET}" == "rk3562" ]]; then
   sudo rm -f Arkbuild/usr/share/vulkan/icd.d/*_icd.*
   # Ensure libvulkan is symlinked properly
   call_chroot "find /usr/lib/aarch64-linux-gnu -type f -name 'libvulkan.so*' -not -name 'libvulkan.so.1.3.274' -delete"

@@ -29,10 +29,11 @@ fi
 # rk3326 bootstraps with the unsuffixed script. A path bc_key cannot find is
 # hashed as its name, so the wrong one would never invalidate the cache.
 BOOTSTRAP_SCRIPT=bootstrap_rootfs-${CHIPSET}.sh
+[ "$CHIPSET" == "rk3562" ] && BOOTSTRAP_SCRIPT=bootstrap_rootfs-rk3566.sh
 [ -f "$BOOTSTRAP_SCRIPT" ] || BOOTSTRAP_SCRIPT=bootstrap_rootfs.sh
 DEPS_CACHE_KEY="$(bc_key needed_packages.txt needed_dev_packages.txt build_deps.sh \
     "$BOOTSTRAP_SCRIPT" \
-    "${DEBIAN_CODE_NAME}" "${CHIPSET}" "${BUILD_ARMHF}" "${BIT}")"
+    "${DEBIAN_CODE_NAME}" "${CHIPSET}" "${BUILD_ARMHF}" "${BIT}" "${RK3562_PORT_SHA:-}")"
 DEPS_CACHE_ASSET="chroot-deps-${CHIPSET}-${BIT}-${DEPS_CACHE_KEY}.tar.zst"
 DEPS_FROM_CACHE=n
 
@@ -124,11 +125,16 @@ do
   else
     FOLDER="armhf"
   fi
+  if [ "$FOLDER" == "armhf" ]; then
+    MALI_BLOB=${whichmali32}
+  else
+    MALI_BLOB=${whichmali}
+  fi
   sudo mkdir -p Arkbuild/usr/lib/${ARCHITECTURE}/
-  wget --retry-connrefused --retry-on-http-error=429 --waitretry=20 -t 65 -T 60 --no-check-certificate -O ${whichmali} https://github.com/christianhaitian/${CHIPSET}_core_builds/raw/refs/heads/master/mali/${FOLDER}/${whichmali}
-  sudo mv ${whichmali} Arkbuild/usr/lib/${ARCHITECTURE}/.
+  wget --retry-connrefused --retry-on-http-error=429 --waitretry=20 -t 65 -T 60 --no-check-certificate -O ${MALI_BLOB} https://github.com/christianhaitian/${CORE_BUILDS_CHIPSET}_core_builds/raw/refs/heads/master/mali/${FOLDER}/${MALI_BLOB}
+  sudo mv ${MALI_BLOB} Arkbuild/usr/lib/${ARCHITECTURE}/.
   cd Arkbuild/usr/lib/${ARCHITECTURE}
-  sudo ln -sf ${whichmali} libMali.so
+  sudo ln -sf ${MALI_BLOB} libMali.so
   for LIB in libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so
   do
     sudo rm -fv ${LIB}
@@ -141,7 +147,19 @@ sudo chroot Arkbuild/ ldconfig -X
 # Install meson
 sudo chroot ${CHROOT_DIR}/ bash -c "git clone https://github.com/mesonbuild/meson.git && ln -s /meson/meson.py /usr/bin/meson"
 
-# Build and install librga
+# Build and install librga. rk3562 takes the BSP's: linux-rga's structs do not
+# match its RGA3 kernel driver ("Cannot get src1 channel buffer").
+if [ "$CHIPSET" == "rk3562" ]; then
+  if [ "$BIT" == "64" ]; then
+    sudo cp ${BSP_PATH}/librga/librga.so.2.1.0 ${CHROOT_DIR}/usr/lib/${ARCH}/
+  else
+    sudo cp ${BSP_PATH}/librga32/librga.so.2.1.0 ${CHROOT_DIR}/usr/lib/${ARCH}/
+  fi
+  sudo ln -sf librga.so.2.1.0 ${CHROOT_DIR}/usr/lib/${ARCH}/librga.so.2
+  sudo ln -sf librga.so.2 ${CHROOT_DIR}/usr/lib/${ARCH}/librga.so
+  sudo mkdir -p ${CHROOT_DIR}/usr/local/include/rga
+  sudo cp ${BSP_PATH}/librga/include/*.h ${BSP_PATH}/librga/include/*.hpp ${CHROOT_DIR}/usr/local/include/rga/
+else
 sudo chroot ${CHROOT_DIR}/ bash -c "cd /home/ark &&
   git clone https://github.com/christianhaitian/linux-rga.git &&
   cd linux-rga &&
@@ -153,6 +171,7 @@ sudo chroot ${CHROOT_DIR}/ bash -c "cd /home/ark &&
   mkdir -p /usr/local/include/rga &&
   cp -f drmrga.h rga.h RgaApi.h RockchipRgaMacro.h /usr/local/include/rga/
   "
+fi
 
 # Build and install libgo2
 sudo chroot ${CHROOT_DIR}/ bash -c "cd /home/ark &&

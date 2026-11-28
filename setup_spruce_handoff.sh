@@ -173,6 +173,7 @@ case "$UNIT" in
   rg351p)    HW_DEVICE_NAME="Anbernic RG351P" ;;
   xumini)    HW_DEVICE_NAME="XU Mini M" ;;
   e5plus)    HW_DEVICE_NAME="GameMT E5 Plus" ;;
+  rg52mini)  HW_DEVICE_NAME="RG52 Mini" ;;
   *)         HW_DEVICE_NAME="" ;;
 esac
 if [ -n "$HW_DEVICE_NAME" ] && ! grep -q '^HW_DEVICE=' Arkbuild/etc/os-release 2>/dev/null; then
@@ -192,6 +193,7 @@ case "$UNIT" in
   rg351p)    SPRUCE_PLATFORM_NAME="RG351P" ;;
   xumini)    SPRUCE_PLATFORM_NAME="XUMiniM" ;;
   e5plus)    SPRUCE_PLATFORM_NAME="E5Plus" ;;
+  rg52mini)  SPRUCE_PLATFORM_NAME="RG52Mini" ;;
   *)         SPRUCE_PLATFORM_NAME="" ;;
 esac
 if [ -n "$SPRUCE_PLATFORM_NAME" ] && ! grep -q '^SPRUCE_PLATFORM=' Arkbuild/etc/os-release 2>/dev/null; then

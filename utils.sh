@@ -39,6 +39,15 @@ if [ "$CHIPSET" == "rk3326" ]; then
 else
   export whichmali=libmali-bifrost-g52-g29p1.so
 fi
+# rk3562 has no core_builds repo; it runs rk3566's builds. Its 32-bit g29p1
+# crashes in GL setup (bmdhacks/dArkOS_rg52mini), so armhf keeps g13p0.
+if [ "$CHIPSET" == "rk3562" ]; then
+  export CORE_BUILDS_CHIPSET=rk3566
+  export whichmali32=libmali-bifrost-g52-g13p0-gbm.so
+else
+  export CORE_BUILDS_CHIPSET=$CHIPSET
+  export whichmali32=$whichmali
+fi
 
 function verify_action() {
   code=$?
@@ -121,14 +130,18 @@ function setup_arkbuild32() {
     sudo cp -a Arkbuild32/usr/lib/arm-linux-gnueabihf/libSDL2-2.0.so.0.${extension} Arkbuild/usr/lib/arm-linux-gnueabihf/libSDL2-2.0.so.0.${extension}
     sudo chroot Arkbuild/ bash -c "ln -sfv /usr/lib/arm-linux-gnueabihf/libSDL2.so /usr/lib/arm-linux-gnueabihf/libSDL2-2.0.so.0"
     sudo chroot Arkbuild/ bash -c "ln -sfv /usr/lib/arm-linux-gnueabihf/libSDL2-2.0.so.0.${extension} /usr/lib/arm-linux-gnueabihf/libSDL2.so"
-    sudo cp -a Arkbuild32/home/ark/linux-rga/build/librga.so* Arkbuild/usr/lib/arm-linux-gnueabihf/
+    if [ "$CHIPSET" == "rk3562" ]; then
+      sudo cp -a Arkbuild32/usr/lib/arm-linux-gnueabihf/librga.so* Arkbuild/usr/lib/arm-linux-gnueabihf/
+    else
+      sudo cp -a Arkbuild32/home/ark/linux-rga/build/librga.so* Arkbuild/usr/lib/arm-linux-gnueabihf/
+    fi
     sudo cp -a Arkbuild32/home/ark/libgo2/libgo2.so* Arkbuild/usr/lib/arm-linux-gnueabihf/
     # Place libmali manually (assumes you have libmali.so or mali drivers ready)
     sudo mkdir -p Arkbuild32/usr/lib/arm-linux-gnueabihf/
-    wget -t 3 -T 60 --no-check-certificate https://github.com/christianhaitian/${CHIPSET}_core_builds/raw/refs/heads/master/mali/armhf/${whichmali}
-    sudo mv ${whichmali} Arkbuild32/usr/lib/arm-linux-gnueabihf/.
+    wget -t 3 -T 60 --no-check-certificate -O ${whichmali32} https://github.com/christianhaitian/${CORE_BUILDS_CHIPSET}_core_builds/raw/refs/heads/master/mali/armhf/${whichmali32}
+    sudo mv ${whichmali32} Arkbuild32/usr/lib/arm-linux-gnueabihf/.
     cd Arkbuild32/usr/lib/arm-linux-gnueabihf
-    sudo ln -sf ${whichmali} libMali.so
+    sudo ln -sf ${whichmali32} libMali.so
     for LIB in libEGL.so libEGL.so.1 libEGL.so.1.1.0 libGLES_CM.so libGLES_CM.so.1 libGLESv1_CM.so libGLESv1_CM.so.1 libGLESv1_CM.so.1.1.0 libGLESv2.so libGLESv2.so.2 libGLESv2.so.2.0.0 libGLESv2.so.2.1.0 libGLESv3.so libGLESv3.so.3 libgbm.so libgbm.so.1 libgbm.so.1.0.0 libmali.so libmali.so.1 libMaliOpenCL.so libOpenCL.so libOpenCL.so.1 libwayland-egl.so libwayland-egl.so.1 libwayland-egl.so.1.0.0
     do
       sudo rm -fv ${LIB}

@@ -1,0 +1,15 @@
+[Unit]
+Description=Apply persistent fan-disabled state
+DefaultDependencies=no
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+Before=basic.target
+ConditionPathExists=/home/ark/.config/.FAN_DISABLED
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/fan-state-apply.sh
+RemainAfterExit=no
+
+[Install]
+WantedBy=basic.target

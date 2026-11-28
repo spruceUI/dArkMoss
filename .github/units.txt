@@ -7,3 +7,4 @@ rg353m
 v10
 rg351p
 e5plus
+rg52mini
